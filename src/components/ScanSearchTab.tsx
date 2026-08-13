@@ -40,6 +40,7 @@ import { calculateAdjustedValuation, calculateCompleteValuation } from "../utils
 import { CameraModal } from "./CameraModal";
 import { BarcodeScannerModal } from "./BarcodeScannerModal";
 import { RecordCoverImage } from "./RecordCoverImage";
+import { apiUrl } from "../utils/apiBase";
 
 interface ScanSearchTabProps {
   onSaveToShelf: (result: RecordScanResult, mediaGrade: GoldmineGrade, sleeveGrade: GoldmineGrade) => void;
@@ -232,7 +233,7 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
         imageBase64: imageBase64 || undefined,
       };
 
-      const res = await fetch("/api/identify-record", {
+      const res = await fetch(apiUrl("identifyRecord"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -264,7 +265,7 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
       setValuationBreakdown(initialCompleteVal);
 
       if (freeTextNotes.trim() || Object.values(packageInclusions).some(Boolean) || currentObi !== "N/A") {
-        fetch("/api/recalculate-valuation", {
+        fetch(apiUrl("recalculateValuation"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -365,7 +366,7 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
     if (!scanResult) return;
     setIsUpdatingValuation(true);
     try {
-      const res = await fetch("/api/recalculate-valuation", {
+      const res = await fetch(apiUrl("recalculateValuation"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

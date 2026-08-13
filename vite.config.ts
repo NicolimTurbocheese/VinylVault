@@ -5,6 +5,11 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // GitHub Pages serves project sites from a /<repo-name>/ subpath, so asset URLs
+    // need that prefix baked in at build time. Set BASE_PATH=/VinylVault/ when building
+    // for GitHub Pages (the deploy workflow does this); defaults to "/" everywhere else
+    // (Netlify, Vercel, custom domains, local dev) where the site is served from the root.
+    base: process.env.BASE_PATH || '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

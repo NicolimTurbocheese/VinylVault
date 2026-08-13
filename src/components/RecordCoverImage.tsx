@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { RefreshCw, ImageOff, Check } from "lucide-react";
+import { apiUrl } from "../utils/apiBase";
 
 interface RecordCoverImageProps {
   src?: string;
@@ -53,7 +54,7 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
         // 1. First call server cover-art API
         try {
           const apiRes = await fetch(
-            `/api/cover-art?artist=${encodeURIComponent(artist)}&albumTitle=${encodeURIComponent(
+            `${apiUrl("coverArt")}?artist=${encodeURIComponent(artist)}&albumTitle=${encodeURIComponent(
               albumTitle
             )}&catalogueNumber=${encodeURIComponent(catalogueNumber || "")}`
           );

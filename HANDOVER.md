@@ -2,7 +2,7 @@
 
 **Project Name:** VinylVault — Vinyl Collector Identification, Grading & Collection Management Suite  
 **Date:** August 2026  
-**Architecture:** Static React 19 frontend (Vite + Tailwind CSS) deployed as a static site, backed by Vercel Serverless Functions (`/api/*.ts`) for calls that need a secret key (Google Gemini AI via `@google/genai`) or need to avoid browser CORS restrictions (Discogs / MusicBrainz / iTunes). Converted from an earlier Express-server architecture — see "Static Conversion Notes" below.
+**Architecture:** Static React 19 frontend (Vite + Tailwind CSS) deployed to **GitHub Pages** via GitHub Actions, calling out cross-origin to **Firebase Cloud Functions** (`functions/`) for anything that needs a secret key (Google Gemini AI via `@google/genai`) or needs to avoid browser CORS restrictions (Discogs / MusicBrainz / iTunes). Optional cross-device sync runs on **Cloud Firestore** directly from the browser. Converted from an earlier Express-server architecture — see "Deployment Architecture Notes" (section 6) for the full history and why it's split this way.
 
 ---
 
@@ -20,7 +20,7 @@ VinylVault is an end-to-end vinyl archiving, valuation, and market analysis tool
 2. **Collection Shelf (`src/components/MyShelfTab.tsx`, `src/App.tsx`)**
    - **Local Persistence**: The shelf collection is stored entirely in the browser via `localStorage` (merging legacy keys `vinylvault_shelf`, `vinyl_vault_shelf_v1`, `vinyl_shelf` on load). There is no server-side database — collections are per-browser/per-device only. See "Known Constraints" below for the tradeoff and the recommended fix.
 
-3. **Multi-Source Cover Art Refresher (`src/components/RecordCoverImage.tsx`, `/api/cover-art`)**
+3. **Multi-Source Cover Art Refresher (`src/components/RecordCoverImage.tsx`, `functions/src/coverArt.ts`)**
    - **Multi-API Fallback**: Queries Discogs API (by catalogue # or pressing title), iTunes Search API (with strict keyword/title matching), and Cover Art Archive (MusicBrainz).
    - **Refresher Control**: Circular refresh badge allows collectors to cycle through verified high-resolution cover references on demand.
 
@@ -40,7 +40,7 @@ VinylVault is an end-to-end vinyl archiving, valuation, and market analysis tool
 | :--- | :--- | :--- |
 | **Missing Collection Records on Reload** (historical, pre-static-conversion) | Server restart reset `shelf-data.json` to default seed, overwriting client state. | Superseded by the static-site conversion: the server-side `shelf-data.json` store was removed entirely and the shelf now persists only in browser `localStorage`, so there's no server restart to lose data to. See "Static Conversion Notes" for the remaining cross-device tradeoff. |
 | **"Save to Cabinet" Terminology Reversion** | Inconsistent UI text across modal, scan, and shelf tabs. | Standardized all action buttons and headings to **"SAVE TO SHELF"** paired with the `BookmarkPlus` icon. |
-| **Incorrect Refreshed Cover Art** (e.g., *Beauty & the Beast* cover appearing for *Grease*) | Unfiltered iTunes search queries for "Various Artists" assigned mismatched soundtrack covers. | Built `/api/cover-art` backend route with strict album title matching, stripping generic artist terms, and catalogue number verification. |
+| **Incorrect Refreshed Cover Art** (e.g., *Beauty & the Beast* cover appearing for *Grease*) | Unfiltered iTunes search queries for "Various Artists" assigned mismatched soundtrack covers. | Built a dedicated `coverArt` backend function (`functions/src/coverArt.ts`) with strict album title matching, stripping generic artist terms, and catalogue number verification. |
 | **Search/Genre Filtering Hiding Items** | Users mistakenly thought records were deleted when a genre filter was active. | Added an active filter banner on **MY SHELF** displaying filtered record count and a one-click **"Clear Filters"** button. |
 
 ---
@@ -57,6 +57,10 @@ VinylVault is an end-to-end vinyl archiving, valuation, and market analysis tool
 3. **Browser iFrame Camera Constraints**:
    - In sandboxed iFrame preview environments, camera permissions can occasionally be restricted by browser policy.
    - *Fallback*: Full support for image drag-and-drop and file selection is provided in `CameraModal`.
+
+4. **Cross-Origin API Calls & Open CORS**:
+   - The frontend (GitHub Pages) and the API (Firebase Cloud Functions) are on different origins, so the functions respond with `Access-Control-Allow-Origin: *` (see `functions/src/_lib/cors.ts`) to allow the browser to call them at all.
+   - This is deliberately permissive since these endpoints have no auth/session/cookie model — the only real secret (`GEMINI_API_KEY`) never leaves the server regardless of who calls it. If that changes (e.g. per-user rate limiting is added), tighten this to a specific allowed origin.
 
 ---
 
@@ -79,34 +83,48 @@ VinylVault is an end-to-end vinyl archiving, valuation, and market analysis tool
 
 ## 5. Environment & Running the Application
 
-- **Frontend Dev Command**: `npm run dev` (runs `vite` only — serves the React app, but `/api/*` calls will 404 since there's no serverless runtime under plain Vite)
-- **Full Local Dev (frontend + API functions)**: `npx vercel dev` (requires a free Vercel account/login; emulates the `/api/*.ts` serverless functions alongside the Vite frontend)
-- **Build Command**: `npm run build` (static `vite build` only — output in `dist/`)
-- **Lint Verification**: `npm run lint`
-- **Environment Variables**: see `.env.example` for the full list. Summary:
-  - `GEMINI_API_KEY`: Set in the Vercel project's environment variables (Settings → Environment Variables). Used only inside `/api/identify-record.ts` and `/api/recalculate-valuation.ts` — never exposed to the client bundle.
-  - `VITE_FIREBASE_*` (six values): optional — only needed to enable Cross-Device Sync (see below). Safe to expose client-side (they're not secrets); set them in Vercel too so they're baked into the production build, and locally in a `.env` file (gitignored) for `npm run dev`.
+This is now **two separate deployable projects** in one repo: the root (frontend, GitHub Pages) and `functions/` (backend, Firebase Cloud Functions). They have separate `package.json`s, separate `node_modules`, and deploy independently.
 
-## 6. Static Conversion Notes (August 2026)
+### Frontend (root)
+- **Dev Command**: `npm run dev` (runs `vite` — serves the React app only; API calls will fail unless `VITE_API_BASE_URL` points at a running/deployed functions backend)
+- **Build Command**: `npm run build` (`vite build`, output in `dist/`)
+- **Lint**: `npm run lint`
+- **Deploys via**: `.github/workflows/deploy-pages.yml` — pushes to `main` automatically build and publish `dist/` to GitHub Pages. Requires **Settings → Pages → Source → GitHub Actions** to be selected in the repo (not "Deploy from a branch") or the workflow's output is ignored.
+- **Environment variables** (set as **Settings → Secrets and variables → Actions → Variables**, consumed by the workflow, see `.env.example` for the full list):
+  - `VITE_API_BASE_URL`: the Firebase Functions base URL (e.g. `https://us-central1-your-project-id.cloudfunctions.net`). Required for Scan/Search, valuation recalculation, and cover art refresh to work at all.
+  - `VITE_FIREBASE_*` (six values): optional, only needed for Cross-Device Sync (section 7).
 
-VinylVault was converted from an Express server (`server.ts`, requiring a persistent Node host) to a fully static frontend + Vercel Serverless Functions architecture, so it can deploy on free static hosting instead of a paid/limited Node host:
+### Backend (`functions/`)
+- **Dev Command**: `npm run dev:functions` (from repo root) or `cd functions && npm run serve` — runs the Firebase emulator locally (needs `firebase login` once, or works unauthenticated against a `--project demo-*` for local-only testing).
+- **Build**: `cd functions && npm run build` (`tsc`, output in `functions/lib/`)
+- **Deploy**: `cd functions && npm run deploy` (or `firebase deploy --only functions` from repo root) — requires `firebase login` and the Blaze (pay-as-you-go) plan enabled on the Firebase project; see section 7 for why.
+- **Secret**: `GEMINI_API_KEY` is NOT a `.env` variable here — it's a Secret Manager secret, set once via `firebase functions:secrets:set GEMINI_API_KEY` (from inside `functions/`). Never put it in `VITE_*`/client env vars.
 
-- **What moved to `/api/*.ts`**: `identify-record.ts` and `recalculate-valuation.ts` (both need `GEMINI_API_KEY` kept secret, so they must run server-side) and `cover-art.ts` (runs server-side mainly to sidestep browser CORS restrictions on Discogs/MusicBrainz). Shared helpers (genre normalization, format cleanup, valuation math, Discogs/MusicBrainz search) live in `api/_lib/shared.ts`.
-- **What changed in the frontend**: `src/App.tsx` no longer calls `/api/shelf*` — there is no server-side shelf database anymore. The shelf collection is stored purely in browser `localStorage`.
-- **Known tradeoff (since resolved)**: without a server-side database, the collection didn't sync across devices/browsers by default — it was local to whichever browser saved it. Cross-device sync via Firestore was added afterward (see section 7) without reintroducing a persistent Node server, confirming the static + serverless architecture was compatible with it.
+## 6. Deployment Architecture Notes (August 2026)
+
+VinylVault went through two architecture changes this month, in order:
+
+1. **Express server → static frontend + serverless functions.** The original `server.ts` (Express, requiring a persistent Node host like Render) was replaced with a static Vite build plus small serverless functions for the handful of endpoints that need a secret key or need to dodge browser CORS. This was necessary regardless of hosting choice — GitHub Pages, Netlify, Vercel, none of them run a long-lived custom Express process.
+2. **Netlify/Vercel functions → Firebase Cloud Functions.** The functions briefly lived on Vercel, then Netlify, before settling on Firebase Cloud Functions — consolidating with Firestore (already needed for Cross-Device Sync, section 7) onto a single provider instead of splitting across two. The tradeoff: Firebase Cloud Functions (2nd gen) require the **Blaze plan**, which needs a credit card on file even though usage stays within the free quota at this app's scale — Netlify Functions didn't require that, but meant maintaining a second unrelated provider.
+
+**Why the frontend and backend are on different hosts at all**: GitHub Pages (the frontend host) is static-file-only — it cannot run *any* server code, so the API genuinely cannot live there. This is why `src/utils/apiBase.ts` builds absolute cross-origin URLs (`VITE_API_BASE_URL`) instead of relative `/api/...` paths, and why the functions set permissive CORS headers.
+
+**GitHub Pages subpath**: project sites are served at `github.io/<repo-name>/`, not the domain root, so `vite.config.ts` sets `base` from a `BASE_PATH` env var (the deploy workflow sets it to `/VinylVault/`) — without this, the built `index.html` would reference asset URLs like `/assets/...` that 404 on GitHub Pages (they'd need to be `/VinylVault/assets/...`).
+
+**Shelf persistence**: still local-only by default (`localStorage`), same as after the first architecture change — no server-side database was reintroduced. See section 7 for the opt-in cross-device sync layer built on top.
 
 ## 7. Cross-Device Sync (August 2026)
 
-Collections can now sync across devices/browsers via a **Vault Code** — no accounts, no login. The whole feature is opt-in: with no Firebase project configured, the app behaves exactly as before (local-only `localStorage`).
+Collections can sync across devices/browsers via a **Vault Code** — no accounts, no login. Opt-in: with no Firebase project configured, the app behaves exactly as before (local-only `localStorage`).
 
-**How it works**: `src/utils/vaultSync.ts` + `src/utils/firebase.ts` talk directly to Cloud Firestore from the browser (no `/api` function involved — Firestore's client SDK handles this, with live updates via `onSnapshot`). A vault's records live at `/vaults/{vaultCode}/shelfItems/{itemId}`. The vault code is a 20-character cryptographically random string generated client-side (`generateVaultCode()`) — knowing the code is the entire access control mechanism, enforced by `firestore.rules` (`vaultCode.size() >= 16`). There's no way to browse/discover other people's vaults; you just can't prove *who* holds a given code (that's the accounts gap noted under Priority 1).
+**How it works**: `src/utils/vaultSync.ts` + `src/utils/firebase.ts` talk directly to Cloud Firestore from the browser (client SDK, not a Cloud Function — Firestore allows direct browser access when rules permit it), with live updates via `onSnapshot`. A vault's records live at `/vaults/{vaultCode}/shelfItems/{itemId}`. The vault code is a 20-character cryptographically random string generated client-side (`generateVaultCode()`) — knowing the code is the entire access control mechanism, enforced by `firestore.rules` (`vaultCode.size() >= 16`). There's no way to browse/discover other people's vaults; you just can't prove *who* holds a given code (that's the accounts gap noted under Priority 1).
 
 **One-time setup to enable it** (skip this and the app just runs local-only):
-1. Create a free project at [Firebase Console](https://console.firebase.google.com/).
+1. Create a free project at [Firebase Console](https://console.firebase.google.com/) (the same project used for Cloud Functions, section 5/6 — one project covers both).
 2. Firestore Database → Create Database → start in **production mode** (the app's own rules, not Firestore's defaults, will govern access).
 3. Firestore Database → Rules → paste the contents of `firestore.rules` in this repo → Publish.
 4. Project Settings → General → Your apps → Add app → Web → copy the six config values it gives you.
-5. Set them as `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID` in Vercel's project environment variables (and locally in `.env` for dev), matching `.env.example`.
-6. Redeploy. The header's SYNC button will now offer "Start Syncing" instead of showing the "not configured" notice.
+5. Set them as GitHub Actions repo variables (`VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`) so the deploy workflow bakes them into the build, and locally in a `.env` file (gitignored) for `npm run dev`, matching `.env.example`.
+6. Push to `main` (or re-run the workflow) to redeploy with sync enabled. The header's SYNC button will now offer "Start Syncing" instead of showing the "not configured" notice.
 
 **UI entry point**: the SYNC button in the header (`src/components/Header.tsx`) opens `SyncSettingsModal`, which lets a user generate a new vault code (uploads their current local collection to it) or join an existing one by pasting a code from another device (merges that device's local-only items into the vault). Disabling sync just stops the live listener and clears the stored code — it does not delete the vault's Firestore data, so re-joining with the same code later picks up where it left off.
