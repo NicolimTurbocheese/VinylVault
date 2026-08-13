@@ -1,12 +1,13 @@
 import React from "react";
-import { Search, Library, BarChart3, Disc3, Cloud, CloudOff } from "lucide-react";
+import { Search, Library, BarChart3, Disc3, Cloud, CloudOff, Package, Palette } from "lucide-react";
 
 interface HeaderProps {
-  activeTab: "scan" | "shelf" | "insights";
-  setActiveTab: (tab: "scan" | "shelf" | "insights") => void;
+  activeTab: "scan" | "shelf" | "insights" | "organise";
+  setActiveTab: (tab: "scan" | "shelf" | "insights" | "organise") => void;
   shelfCount: number;
   isSyncing: boolean;
   onOpenSync: () => void;
+  onOpenTheme: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -15,6 +16,7 @@ export const Header: React.FC<HeaderProps> = ({
   shelfCount,
   isSyncing,
   onOpenSync,
+  onOpenTheme,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-[#F5F2EB]/95 backdrop-blur-md border-b border-[#E2DCD0]">
@@ -90,6 +92,18 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             <button
+              onClick={() => setActiveTab("organise")}
+              className={`flex items-center gap-1.5 py-1.5 px-2.5 uppercase tracking-wider transition-all rounded-md ${
+                activeTab === "organise"
+                  ? "text-[#A94A42] bg-[#A94A42]/10 border border-[#A94A42]/30 font-bold"
+                  : "text-[#6B655B] border border-transparent hover:text-[#2B2B2B] hover:bg-[#E2DCD0]/30"
+              }`}
+            >
+              <Package className="w-3.5 h-3.5" />
+              <span>ORGANISE</span>
+            </button>
+
+            <button
               onClick={onOpenSync}
               title={isSyncing ? "Cross-device sync is on" : "Set up cross-device sync"}
               className={`flex items-center gap-1.5 py-1.5 px-2.5 uppercase tracking-wider transition-all rounded-md border ${
@@ -100,6 +114,14 @@ export const Header: React.FC<HeaderProps> = ({
             >
               {isSyncing ? <Cloud className="w-3.5 h-3.5" /> : <CloudOff className="w-3.5 h-3.5" />}
               <span className="hidden sm:inline">{isSyncing ? "SYNCED" : "SYNC"}</span>
+            </button>
+
+            <button
+              onClick={onOpenTheme}
+              title="Change visual theme"
+              className="p-2 rounded-md text-[#6B655B] border border-transparent hover:text-[#A94A42] hover:bg-[#E2DCD0]/30 transition-all"
+            >
+              <Palette className="w-3.5 h-3.5" />
             </button>
           </nav>
         </div>

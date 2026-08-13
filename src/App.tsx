@@ -4,24 +4,27 @@ import { ScanSearchTab } from "./components/ScanSearchTab";
 import { MyShelfTab } from "./components/MyShelfTab";
 import { CollectionInsightsTab } from "./components/CollectionInsightsTab";
 import { AddToShelfModal } from "./components/AddToShelfModal";
+import { OrganiseTab } from "./components/OrganiseTab";
 import { ThemeSelectorModal, UITheme } from "./components/ThemeSelectorModal";
 import { SyncSettingsModal, SyncStatus } from "./components/SyncSettingsModal";
-import { RecordScanResult, ShelfItem } from "./types";
+import { ToastStack, ToastMessage } from "./components/ToastStack";
+import { RecordScanResult, ShelfItem, VinylBox, UNCATEGORISED_BOX_ID } from "./types";
 import { calculateAdjustedValuation } from "./utils/valuation";
 import { cleanFormatSpec } from "./utils/format";
 import { normalizeDiscogsGenre } from "./utils/genre";
 import { isFirebaseConfigured } from "./utils/firebase";
+import { getStoredBoxes, saveBoxesToLocal, generateBoxId } from "./utils/boxes";
 import {
   getStoredVaultCode,
   storeVaultCode,
   clearStoredVaultCode,
   generateVaultCode,
   normalizeVaultCode,
-  subscribeToVault,
-  fetchVaultItemsOnce,
-  upsertVaultItem,
-  deleteVaultItem,
-  bulkUpsertVaultItems,
+  subscribeToVaultCollection,
+  fetchVaultCollectionOnce,
+  upsertVaultDoc,
+  deleteVaultDoc,
+  bulkUpsertVaultDocs,
 } from "./utils/vaultSync";
 import type { Unsubscribe } from "firebase/firestore";
 
@@ -101,9 +104,21 @@ const INITIAL_SEED_SHELF: ShelfItem[] = [
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"scan" | "shelf" | "insights">("scan");
+  const [activeTab, setActiveTab] = useState<"scan" | "shelf" | "insights" | "organise">("scan");
   const [shelfItems, setShelfItems] = useState<ShelfItem[]>([]);
-  
+  const [boxes, setBoxes] = useState<VinylBox[]>([]);
+
+  // Toast feedback
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const showToast = (message: string, variant: "success" | "error" = "success") => {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    setToasts((prev) => [...prev, { id, message, variant }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3000);
+  };
+  const dismissToast = (id: string) => setToasts((prev) => prev.filter((t) => t.id !== id));
+
   // Theme state
   const [currentTheme, setCurrentTheme] = useState<UITheme>(() => {
     return (localStorage.getItem("vinylvault_theme") as UITheme) || "gold";
@@ -115,7 +130,8 @@ export default function App() {
   const [vaultCode, setVaultCode] = useState<string | null>(() => getStoredVaultCode());
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("disabled");
   const [syncError, setSyncError] = useState<string | null>(null);
-  const unsubscribeRef = useRef<Unsubscribe | null>(null);
+  const shelfUnsubscribeRef = useRef<Unsubscribe | null>(null);
+  const boxesUnsubscribeRef = useRef<Unsubscribe | null>(null);
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -131,14 +147,16 @@ export default function App() {
     localStorage.setItem("vinylvault_theme", currentTheme);
   }, [currentTheme]);
 
-  // Load shelf items on mount from localStorage, falling back to the seed collection
+  // Load shelf items & boxes on mount from localStorage, falling back to the seed collection
   useEffect(() => {
     loadShelf();
+    setBoxes(getStoredBoxes());
     if (vaultCode) {
       connectToVault(vaultCode, { pushLocalOnConnect: false });
     }
     return () => {
-      unsubscribeRef.current?.();
+      shelfUnsubscribeRef.current?.();
+      boxesUnsubscribeRef.current?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -211,50 +229,85 @@ export default function App() {
     localStorage.setItem("vinylvault_shelf", JSON.stringify(cleanedItems));
   };
 
-  // Subscribes to a vault's live Firestore collection. When pushLocalOnConnect is true,
-  // any items already on this device that the vault doesn't have yet are uploaded first
-  // (used when linking a device for the first time), so nothing gets silently dropped.
-  const connectToVault = async (code: string, opts: { pushLocalOnConnect: boolean }) => {
+  const saveBoxesToLocalState = (items: VinylBox[]) => {
+    setBoxes(items);
+    saveBoxesToLocal(items);
+  };
+
+  // Subscribes to a vault's two live Firestore collections (shelf items & boxes). When
+  // pushLocalOnConnect is true, anything already on this device that the vault doesn't
+  // have yet is uploaded first (used when linking a device for the first time), so
+  // nothing gets silently dropped. Returns false if the initial merge failed (the live
+  // subscription outcome after that point is reflected in syncStatus, not this return
+  // value, since it resolves asynchronously after this promise settles).
+  const connectToVault = async (code: string, opts: { pushLocalOnConnect: boolean }): Promise<boolean> => {
     setSyncStatus("connecting");
     setSyncError(null);
 
     if (opts.pushLocalOnConnect) {
       try {
-        const remoteItems = await fetchVaultItemsOnce(code);
+        const remoteItems = await fetchVaultCollectionOnce<ShelfItem>(code, "shelfItems");
         const remoteIds = new Set(remoteItems.map((i) => i.id));
-        const localOnly = shelfItems.filter((i) => !remoteIds.has(i.id));
-        if (localOnly.length > 0) {
-          await bulkUpsertVaultItems(code, localOnly.map(sanitizeShelfItem));
+        const localOnlyItems = shelfItems.filter((i) => !remoteIds.has(i.id));
+        if (localOnlyItems.length > 0) {
+          await bulkUpsertVaultDocs(code, "shelfItems", localOnlyItems.map(sanitizeShelfItem));
+        }
+
+        const remoteBoxes = await fetchVaultCollectionOnce<VinylBox>(code, "boxes");
+        const remoteBoxIds = new Set(remoteBoxes.map((b) => b.id));
+        const localOnlyBoxes = boxes.filter((b) => !remoteBoxIds.has(b.id));
+        if (localOnlyBoxes.length > 0) {
+          await bulkUpsertVaultDocs(code, "boxes", localOnlyBoxes);
         }
       } catch (err) {
-        console.error("Failed to merge local items into vault:", err);
+        console.error("Failed to merge local data into vault:", err);
         setSyncStatus("error");
         setSyncError(err instanceof Error ? err.message : "Failed to reach the vault.");
-        return;
+        return false;
       }
     }
 
-    unsubscribeRef.current?.();
-    unsubscribeRef.current = subscribeToVault(
+    shelfUnsubscribeRef.current?.();
+    shelfUnsubscribeRef.current = subscribeToVaultCollection<ShelfItem>(
       code,
+      "shelfItems",
       (items) => {
         saveShelfToLocal(items);
         setSyncStatus("connected");
         setSyncError(null);
       },
       (err) => {
-        console.error("Vault sync error:", err);
+        console.error("Vault sync error (shelf):", err);
         setSyncStatus("error");
         setSyncError(err instanceof Error ? err.message : "Lost connection to the vault.");
       }
     );
+
+    boxesUnsubscribeRef.current?.();
+    boxesUnsubscribeRef.current = subscribeToVaultCollection<VinylBox>(
+      code,
+      "boxes",
+      (items) => {
+        saveBoxesToLocalState(items);
+        setSyncStatus("connected");
+        setSyncError(null);
+      },
+      (err) => {
+        console.error("Vault sync error (boxes):", err);
+        setSyncStatus("error");
+        setSyncError(err instanceof Error ? err.message : "Lost connection to the vault.");
+      }
+    );
+
+    return true;
   };
 
   const enableSyncNewVault = async () => {
     const code = generateVaultCode();
     storeVaultCode(code);
     setVaultCode(code);
-    await connectToVault(code, { pushLocalOnConnect: true });
+    const ok = await connectToVault(code, { pushLocalOnConnect: true });
+    if (ok) showToast("Sync enabled — this device now has a Vault Code.");
   };
 
   const joinVault = async (rawCode: string) => {
@@ -262,19 +315,24 @@ export default function App() {
     if (!code) return;
     storeVaultCode(code);
     setVaultCode(code);
-    await connectToVault(code, { pushLocalOnConnect: true });
+    const ok = await connectToVault(code, { pushLocalOnConnect: true });
+    if (ok) showToast("Joined vault — collections merged.");
   };
 
   const disableSync = () => {
-    unsubscribeRef.current?.();
-    unsubscribeRef.current = null;
+    shelfUnsubscribeRef.current?.();
+    shelfUnsubscribeRef.current = null;
+    boxesUnsubscribeRef.current?.();
+    boxesUnsubscribeRef.current = null;
     clearStoredVaultCode();
     setVaultCode(null);
     setSyncStatus("disabled");
     setSyncError(null);
+    showToast("Sync turned off — this device is now local-only.");
   };
 
-  const handleSaveToShelf = (item: ShelfItem) => {
+  const handleSaveToShelf = (item: ShelfItem, opts: { showFeedback?: boolean } = {}) => {
+    const { showFeedback = true } = opts;
     const existingIndex = shelfItems.findIndex((i) => i.id === item.id);
     let updated: ShelfItem[];
 
@@ -286,23 +344,88 @@ export default function App() {
     }
 
     saveShelfToLocal(updated);
+    if (showFeedback) {
+      showToast(existingIndex >= 0 ? `Updated "${item.albumTitle}"` : `Saved "${item.albumTitle}" to shelf`);
+    }
 
     if (vaultCode && syncStatus === "connected") {
-      upsertVaultItem(vaultCode, sanitizeShelfItem(item)).catch((err) => {
+      upsertVaultDoc(vaultCode, "shelfItems", sanitizeShelfItem(item)).catch((err) => {
         console.error("Failed to sync item to vault:", err);
       });
     }
   };
 
   const handleDeleteItem = (id: string) => {
+    const item = shelfItems.find((i) => i.id === id);
     const updated = shelfItems.filter((item) => item.id !== id);
     saveShelfToLocal(updated);
+    if (item) showToast(`Removed "${item.albumTitle}" from shelf`);
 
     if (vaultCode && syncStatus === "connected") {
-      deleteVaultItem(vaultCode, id).catch((err) => {
+      deleteVaultDoc(vaultCode, "shelfItems", id).catch((err) => {
         console.error("Failed to sync deletion to vault:", err);
       });
     }
+  };
+
+  const handleCreateBox = (name: string) => {
+    const box: VinylBox = { id: generateBoxId(), name, createdAt: new Date().toISOString() };
+    saveBoxesToLocalState([...boxes, box]);
+    showToast(`Box "${name}" created`);
+
+    if (vaultCode && syncStatus === "connected") {
+      upsertVaultDoc(vaultCode, "boxes", box).catch((err) => {
+        console.error("Failed to sync new box to vault:", err);
+      });
+    }
+  };
+
+  const handleRenameBox = (id: string, name: string) => {
+    const box = boxes.find((b) => b.id === id);
+    if (!box) return;
+    const updatedBox = { ...box, name };
+    saveBoxesToLocalState(boxes.map((b) => (b.id === id ? updatedBox : b)));
+    showToast(`Box renamed to "${name}"`);
+
+    if (vaultCode && syncStatus === "connected") {
+      upsertVaultDoc(vaultCode, "boxes", updatedBox).catch((err) => {
+        console.error("Failed to sync box rename to vault:", err);
+      });
+    }
+  };
+
+  const handleDeleteBox = (id: string) => {
+    const box = boxes.find((b) => b.id === id);
+    saveBoxesToLocalState(boxes.filter((b) => b.id !== id));
+    if (box) showToast(`Box "${box.name}" deleted — its records moved to Uncategorised`);
+
+    // Records filed in the deleted box fall back to Uncategorised rather than vanishing.
+    const affectedItems = shelfItems.filter((item) => item.boxId === id);
+    if (affectedItems.length > 0) {
+      const updated = shelfItems.map((item) => (item.boxId === id ? { ...item, boxId: undefined } : item));
+      saveShelfToLocal(updated);
+      if (vaultCode && syncStatus === "connected") {
+        for (const item of affectedItems) {
+          upsertVaultDoc(vaultCode, "shelfItems", sanitizeShelfItem({ ...item, boxId: undefined })).catch((err) => {
+            console.error("Failed to sync box-orphaned item to vault:", err);
+          });
+        }
+      }
+    }
+
+    if (vaultCode && syncStatus === "connected") {
+      deleteVaultDoc(vaultCode, "boxes", id).catch((err) => {
+        console.error("Failed to sync box deletion to vault:", err);
+      });
+    }
+  };
+
+  const handleMoveItemToBox = (itemId: string, boxId: string) => {
+    const item = shelfItems.find((i) => i.id === itemId);
+    if (!item) return;
+    const targetBoxName = boxId === UNCATEGORISED_BOX_ID ? "Uncategorised" : boxes.find((b) => b.id === boxId)?.name || "box";
+    handleSaveToShelf({ ...item, boxId: boxId === UNCATEGORISED_BOX_ID ? undefined : boxId }, { showFeedback: false });
+    showToast(`Moved "${item.albumTitle}" to ${targetBoxName}`);
   };
 
   const handleOpenModalForScan = (record: RecordScanResult) => {
@@ -329,6 +452,7 @@ export default function App() {
         shelfCount={shelfItems.length}
         isSyncing={syncStatus === "connected"}
         onOpenSync={() => setIsSyncModalOpen(true)}
+        onOpenTheme={() => setIsThemeModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -354,6 +478,7 @@ export default function App() {
         <div style={{ display: activeTab === "shelf" ? "block" : "none" }}>
           <MyShelfTab
             shelfItems={shelfItems}
+            boxes={boxes}
             onEditItem={handleOpenModalForEdit}
             onDeleteItem={handleDeleteItem}
             onGoToScan={() => setActiveTab("scan")}
@@ -364,6 +489,18 @@ export default function App() {
           <CollectionInsightsTab
             shelfItems={shelfItems}
             onGoToScan={() => setActiveTab("scan")}
+          />
+        </div>
+
+        <div style={{ display: activeTab === "organise" ? "block" : "none" }}>
+          <OrganiseTab
+            boxes={boxes}
+            shelfItems={shelfItems}
+            onCreateBox={handleCreateBox}
+            onRenameBox={handleRenameBox}
+            onDeleteBox={handleDeleteBox}
+            onMoveItem={handleMoveItemToBox}
+            onGoToShelf={() => setActiveTab("shelf")}
           />
         </div>
       </main>
@@ -387,6 +524,7 @@ export default function App() {
         onClose={() => setIsModalOpen(false)}
         record={selectedRecordForModal}
         existingItem={editingItem}
+        boxes={boxes}
         onSave={(item) => {
           handleSaveToShelf(item);
           setIsModalOpen(false);
@@ -406,6 +544,17 @@ export default function App() {
         onJoinVault={joinVault}
         onDisableSync={disableSync}
       />
+
+      {/* Theme Selector Modal */}
+      <ThemeSelectorModal
+        isOpen={isThemeModalOpen}
+        onClose={() => setIsThemeModalOpen(false)}
+        currentTheme={currentTheme}
+        onSelectTheme={setCurrentTheme}
+      />
+
+      {/* Toast Notifications */}
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

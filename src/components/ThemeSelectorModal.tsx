@@ -1,5 +1,6 @@
 import React from "react";
 import { Palette, Check, Sparkles, X } from "lucide-react";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 export type UITheme = "gold" | "nordic" | "swiss" | "cyber";
 
@@ -106,11 +107,19 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
   currentTheme,
   onSelectTheme,
 }) => {
+  useEscapeToClose(isOpen, onClose);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-      <div className="bg-[#18181b] text-zinc-100 border border-[#D4AF37]/30 rounded-xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#18181b] text-zinc-100 border border-[#D4AF37]/30 rounded-xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Close button */}
         <button
           onClick={onClose}

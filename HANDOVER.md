@@ -32,6 +32,10 @@ VinylVault is an end-to-end vinyl archiving, valuation, and market analysis tool
    - Portfolio total valuation (Low, Median, High).
    - Top valuable records leaderboard, genre breakdown charts (Recharts), and country pressing analytics.
 
+6. **Organise: Physical Storage Boxes (`src/components/OrganiseTab.tsx`)**
+   - Custom, user-named "Boxes" representing physical storage (crates, shelves, cases). See section 8 for details.
+   - Editable genre/sub-genre categorization per record (`src/components/AddToShelfModal.tsx`) and multi-select genre + style filtering on **MY SHELF** (`src/components/MyShelfTab.tsx`).
+
 ---
 
 ## 2. Recent Bug Fixes & Resolved Issues
@@ -128,3 +132,17 @@ Collections can sync across devices/browsers via a **Vault Code** — no account
 6. Push to `main` (or re-run the workflow) to redeploy with sync enabled. The header's SYNC button will now offer "Start Syncing" instead of showing the "not configured" notice.
 
 **UI entry point**: the SYNC button in the header (`src/components/Header.tsx`) opens `SyncSettingsModal`, which lets a user generate a new vault code (uploads their current local collection to it) or join an existing one by pasting a code from another device (merges that device's local-only items into the vault). Disabling sync just stops the live listener and clears the stored code — it does not delete the vault's Firestore data, so re-joining with the same code later picks up where it left off.
+
+## 8. Organise: Physical Storage Boxes & Genre Editing (August 2026)
+
+Two related additions on top of the existing genre framework (`src/utils/genre.ts`, always normalizes to one Discogs macro-genre + up to 3 styles):
+
+**Editable genre/styles**: `AddToShelfModal` previously only *displayed* the genre/styles a scan produced — there was no way to correct a bad AI guess or add a style Discogs doesn't use. It now has a Genre dropdown (constrained to the fixed Discogs macro-genre list, since that's what genre *means* in this app) and a free-text Sub-Genres/Styles chip editor (up to 3). This is safe against `App.tsx`'s `sanitizeShelfItem` re-normalization on every save/load: as long as the genre stays an exact macro-genre string, `normalizeDiscogsGenre` passes user-entered styles through unchanged (dedup + cap at 3) rather than overwriting them.
+
+**Multi-select genre/style filtering on MY SHELF**: the old genre filter was a single-select dropdown. `MyShelfTab` now has a togglable chip panel for both genre and style, each multi-select (OR within a facet, AND across facets — e.g. "Rock or Jazz" AND "Prog Rock or Fusion"). Style options are computed live from whatever genre(s) are currently selected, so the style list narrows as you filter by genre.
+
+**Organise tab (`src/components/OrganiseTab.tsx`)**: user-defined "Boxes" represent physical storage (a crate, a shelf, a case — whatever the collector actually uses). Data model: `VinylBox { id, name, createdAt }` (`src/types.ts`), stored in `src/utils/boxes.ts` (`localStorage` key `vinylvault_boxes`) and, when Cross-Device Sync is enabled, also synced through Firestore under `/vaults/{vaultCode}/boxes/{boxId}` — `src/utils/vaultSync.ts` was generalized from a shelf-items-only module (`subscribeToVault`, `upsertVaultItem`, ...) to a generic per-collection one (`subscribeToVaultCollection<T>`, `upsertVaultDoc<T>`, ...) so both `shelfItems` and `boxes` reuse the same sync plumbing; `firestore.rules` was correspondingly broadened from a hardcoded `shelfItems` path match to `/vaults/{vaultCode}/{collection}/{docId}`.
+
+- Each `ShelfItem` optionally carries a `boxId` (set via the "Storage Box" selector in `AddToShelfModal`, or by moving it in the Organise tab itself). No `boxId`, or a `boxId` pointing at a box that no longer exists, means the record shows under the virtual **Uncategorised** box — this is computed at render time, not a real stored box, so it can't be renamed or deleted.
+- Deleting a box doesn't touch the underlying shelf records — anything filed in it just falls back to Uncategorised (`App.tsx`'s `handleDeleteBox` clears `boxId` on affected items and re-syncs them).
+- The assigned box (if any) also shows as a small badge on each card in **MY SHELF**, not just inside the Organise tab.

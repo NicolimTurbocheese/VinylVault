@@ -17,16 +17,19 @@ import {
   FileJson,
   Calendar,
   Layers,
-  ArrowLeft
+  ArrowLeft,
+  Package
 } from "lucide-react";
-import { ShelfItem } from "../types";
+import { ShelfItem, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { exportToCSV, exportToJSON } from "../utils/valuation";
 import { cleanFormatSpec } from "../utils/format";
 import { normalizeDiscogsGenre, DISCOGS_MACRO_GENRES } from "../utils/genre";
 import { RecordCoverImage } from "./RecordCoverImage";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 interface MyShelfTabProps {
   shelfItems: ShelfItem[];
+  boxes: VinylBox[];
   onEditItem: (item: ShelfItem) => void;
   onDeleteItem: (id: string) => void;
   onGoToScan: () => void;
@@ -34,14 +37,50 @@ interface MyShelfTabProps {
 
 export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   shelfItems,
+  boxes,
   onEditItem,
   onDeleteItem,
   onGoToScan,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedGenreFilter, setSelectedGenreFilter] = useState<string>("ALL");
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [sortBy, setSortBy] = useState<"value-desc" | "value-asc" | "title" | "year" | "added">("value-desc");
   const [itemToDelete, setItemToDelete] = useState<ShelfItem | null>(null);
+
+  useEscapeToClose(!!itemToDelete, () => setItemToDelete(null));
+
+  const toggleGenre = (genre: string) => {
+    setSelectedGenres((prev) =>
+      prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre]
+    );
+  };
+
+  const toggleStyle = (style: string) => {
+    setSelectedStyles((prev) =>
+      prev.includes(style) ? prev.filter((s) => s !== style) : [...prev, style]
+    );
+  };
+
+  // Items after genre filtering only (used to compute relevant style counts/options)
+  const genreFilteredItems = shelfItems.filter((item) => {
+    if (selectedGenres.length === 0) return true;
+    const norm = normalizeDiscogsGenre(item.genre, item.styles);
+    return selectedGenres.includes(norm.genre);
+  });
+
+  // All distinct styles available within the genre-filtered set, with counts
+  const availableStyles = (() => {
+    const counts = new Map<string, number>();
+    for (const item of genreFilteredItems) {
+      const norm = normalizeDiscogsGenre(item.genre, item.styles);
+      for (const style of norm.styles) {
+        counts.set(style, (counts.get(style) || 0) + 1);
+      }
+    }
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  })();
 
   // Summary Metrics
   const totalAlbums = shelfItems.length;
@@ -67,8 +106,13 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   const filteredItems = shelfItems.filter((item) => {
     const norm = normalizeDiscogsGenre(item.genre, item.styles);
 
-    // Genre Filter check
-    if (selectedGenreFilter !== "ALL" && norm.genre !== selectedGenreFilter) {
+    // Genre Filter check (multi-select, OR within genres)
+    if (selectedGenres.length > 0 && !selectedGenres.includes(norm.genre)) {
+      return false;
+    }
+
+    // Style Filter check (multi-select, OR within styles — item matches if it has ANY selected style)
+    if (selectedStyles.length > 0 && !norm.styles.some((s) => selectedStyles.includes(s))) {
       return false;
     }
 
@@ -209,26 +253,20 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             />
           </div>
 
-          {/* Macro-Genre Dropdown Filter */}
-          <div className="flex items-center gap-1.5 text-xs text-[#6B655B] font-sans w-full sm:w-auto">
+          {/* Genre + Style Multi-Select Filter Toggle */}
+          <button
+            onClick={() => setIsFilterPanelOpen((prev) => !prev)}
+            className={`flex items-center gap-1.5 text-xs font-sans px-2.5 py-1.5 rounded-md border transition w-full sm:w-auto justify-center ${
+              selectedGenres.length > 0 || selectedStyles.length > 0
+                ? "text-[#A94A42] bg-[#A94A42]/10 border-[#A94A42]/30 font-bold"
+                : "text-[#6B655B] bg-[#EFEAE0] border-[#D8D0C0] hover:bg-[#E2DCD0]/40"
+            }`}
+          >
             <Tag className="w-3.5 h-3.5 text-[#A94A42]" />
-            <span className="uppercase text-[10px] tracking-wider shrink-0 font-bold">Genre:</span>
-            <select
-              value={selectedGenreFilter}
-              onChange={(e) => setSelectedGenreFilter(e.target.value)}
-              className="w-full sm:w-auto bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#A94A42] transition truncate font-sans"
-            >
-              <option value="ALL">All Genres ({shelfItems.length})</option>
-              {DISCOGS_MACRO_GENRES.map((g) => {
-                const count = shelfItems.filter(item => normalizeDiscogsGenre(item.genre, item.styles).genre === g).length;
-                return (
-                  <option key={g} value={g}>
-                    {g} ({count})
-                  </option>
-                );
-              })}
-            </select>
-          </div>
+            <span className="uppercase text-[10px] tracking-wider font-bold">
+              Genre / Style{selectedGenres.length + selectedStyles.length > 0 ? ` (${selectedGenres.length + selectedStyles.length})` : ""}
+            </span>
+          </button>
         </div>
 
         {/* Sort selector & Export Buttons */}
@@ -274,17 +312,88 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
         </div>
       </div>
 
-      {/* Active Filter Notice Bar if search or genre filter is active */}
-      {(selectedGenreFilter !== "ALL" || searchQuery.trim() !== "") && (
+      {/* Genre + Style Multi-Select Filter Panel */}
+      {isFilterPanelOpen && (
+        <div className="p-4 rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] shadow-sm space-y-4 font-sans">
+          <div>
+            <span className="text-[10px] uppercase tracking-wider font-bold text-[#6B655B] block mb-2">
+              Genre <span className="opacity-60">(select multiple — records matching ANY selected genre)</span>
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {DISCOGS_MACRO_GENRES.map((g) => {
+                const count = shelfItems.filter((item) => normalizeDiscogsGenre(item.genre, item.styles).genre === g).length;
+                if (count === 0) return null;
+                const isActive = selectedGenres.includes(g);
+                return (
+                  <button
+                    key={g}
+                    onClick={() => toggleGenre(g)}
+                    className={`text-[10px] px-2.5 py-1 rounded-full border transition ${
+                      isActive
+                        ? "bg-[#A94A42] border-[#A94A42] text-white font-bold"
+                        : "bg-[#EFEAE0] border-[#D8D0C0] text-[#2B2B2B] hover:border-[#A94A42]/50"
+                    }`}
+                  >
+                    {g} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {availableStyles.length > 0 && (
+            <div>
+              <span className="text-[10px] uppercase tracking-wider font-bold text-[#6B655B] block mb-2">
+                Style <span className="opacity-60">(select multiple — records matching ANY selected style)</span>
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {availableStyles.map(([style, count]) => {
+                  const isActive = selectedStyles.includes(style);
+                  return (
+                    <button
+                      key={style}
+                      onClick={() => toggleStyle(style)}
+                      className={`text-[10px] px-2.5 py-1 rounded-full border transition ${
+                        isActive
+                          ? "bg-[#A94A42] border-[#A94A42] text-white font-bold"
+                          : "bg-[#EFEAE0] border-[#D8D0C0] text-[#2B2B2B] hover:border-[#A94A42]/50"
+                      }`}
+                    >
+                      {style} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {(selectedGenres.length > 0 || selectedStyles.length > 0) && (
+            <button
+              onClick={() => {
+                setSelectedGenres([]);
+                setSelectedStyles([]);
+              }}
+              className="text-[10px] font-bold uppercase tracking-wider text-[#A94A42] hover:underline cursor-pointer"
+            >
+              Clear Genre/Style Selection
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Active Filter Notice Bar if search or genre/style filter is active */}
+      {(selectedGenres.length > 0 || selectedStyles.length > 0 || searchQuery.trim() !== "") && (
         <div className="flex items-center justify-between px-4 py-2.5 rounded-md bg-[#EFEAE0] border border-[#D8D0C0] text-xs font-sans text-[#6B655B]">
           <span>
             Showing <strong className="text-[#2B2B2B]">{filteredItems.length}</strong> of <strong className="text-[#2B2B2B]">{totalAlbums}</strong> records
-            {selectedGenreFilter !== "ALL" && ` in ${selectedGenreFilter}`}
+            {selectedGenres.length > 0 && ` in ${selectedGenres.join(", ")}`}
+            {selectedStyles.length > 0 && ` styled ${selectedStyles.join(", ")}`}
             {searchQuery.trim() && ` matching "${searchQuery}"`}
           </span>
           <button
             onClick={() => {
-              setSelectedGenreFilter("ALL");
+              setSelectedGenres([]);
+              setSelectedStyles([]);
               setSearchQuery("");
             }}
             className="text-[10px] font-bold uppercase tracking-wider text-[#A94A42] hover:underline cursor-pointer"
@@ -396,6 +505,13 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
 
                 {/* Custom Notes & Shelf Details */}
                 <div className="space-y-1.5 text-xs text-[#6B655B] pt-1 font-sans">
+                  {item.boxId && item.boxId !== UNCATEGORISED_BOX_ID && boxes.some((b) => b.id === item.boxId) && (
+                    <div className="flex items-center gap-1.5 text-[#2B2B2B]">
+                      <Package className="w-3.5 h-3.5 text-[#A94A42]" />
+                      <span>Box: {boxes.find((b) => b.id === item.boxId)?.name}</span>
+                    </div>
+                  )}
+
                   {item.physicalShelfLocation && (
                     <div className="flex items-center gap-1.5 text-[#2B2B2B]">
                       <MapPin className="w-3.5 h-3.5 text-[#A94A42]" />
@@ -473,8 +589,14 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
 
       {/* Delete Confirmation Modal */}
       {itemToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-[#FAF8F3] border border-[#E2DCD0] rounded-xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+          onClick={() => setItemToDelete(null)}
+        >
+          <div
+            className="bg-[#FAF8F3] border border-[#E2DCD0] rounded-xl p-6 max-w-md w-full space-y-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center gap-3 text-[#A94A42]">
               <div className="p-2.5 rounded-full bg-[#A94A42]/10 border border-[#A94A42]/20">
                 <Trash2 className="w-5 h-5 text-[#A94A42]" />

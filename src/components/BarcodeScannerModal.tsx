@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Barcode, X, AlertCircle } from "lucide-react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 interface BarcodeScannerModalProps {
   isOpen: boolean;
@@ -16,6 +17,13 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState("");
   const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  const handleClose = () => {
+    stopScanner();
+    onClose();
+  };
+
+  useEscapeToClose(isOpen, handleClose);
 
   useEffect(() => {
     if (isOpen) {
@@ -92,8 +100,14 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+      onClick={handleClose}
+    >
+      <div
+        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/80">
           <div className="flex items-center gap-2 text-[#D4AF37] font-semibold text-base">
@@ -101,10 +115,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             <span>Scan Vinyl Barcode (EAN / UPC / MusicBrainz)</span>
           </div>
           <button
-            onClick={() => {
-              stopScanner();
-              onClose();
-            }}
+            onClick={handleClose}
             className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
           >
             <X className="w-5 h-5" />

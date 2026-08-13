@@ -2,10 +2,11 @@ rules_version = '2';
 
 // VinylVault Cross-Device Sync — Firestore Security Rules
 //
-// Access model: each collection lives under /vaults/{vaultCode}/shelfItems/{itemId}.
+// Access model: each synced record type lives under its own subcollection of a vault,
+// e.g. /vaults/{vaultCode}/shelfItems/{itemId} and /vaults/{vaultCode}/boxes/{boxId}.
 // The vault code IS the access credential (like a shared secret room code) — there is
 // no Firebase Auth / login in this app. Anyone who knows a vault's code can read and
-// write that vault's records, nothing else.
+// write everything under that vault, nothing else.
 //
 // This is only safe because vault codes are generated client-side as 20-character
 // cryptographically random strings (see src/utils/vaultSync.ts, generateVaultCode),
@@ -15,7 +16,7 @@ rules_version = '2';
 // To apply: Firebase Console → Firestore Database → Rules → paste this file → Publish.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /vaults/{vaultCode}/shelfItems/{itemId} {
+    match /vaults/{vaultCode}/{collection}/{docId} {
       allow read, write: if vaultCode is string && vaultCode.size() >= 16;
     }
   }

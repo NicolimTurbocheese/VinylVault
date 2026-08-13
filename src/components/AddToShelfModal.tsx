@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from "react";
-import { X, Save, DollarSign, MapPin, Bookmark, BookmarkPlus, Award, Tag, TrendingUp, TrendingDown } from "lucide-react";
-import { RecordScanResult, GoldmineGrade, GOLDMINE_GRADES, ShelfItem, ObiCondition, PackageInclusions } from "../types";
+import { X, Save, DollarSign, MapPin, Bookmark, BookmarkPlus, Award, Tag, TrendingUp, TrendingDown, Package, Plus } from "lucide-react";
+import { RecordScanResult, GoldmineGrade, GOLDMINE_GRADES, ShelfItem, ObiCondition, PackageInclusions, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { calculateAdjustedValuation, calculateCompleteValuation } from "../utils/valuation";
 import { cleanFormatSpec } from "../utils/format";
-import { normalizeDiscogsGenre } from "../utils/genre";
+import { normalizeDiscogsGenre, DISCOGS_MACRO_GENRES } from "../utils/genre";
 import { RecordCoverImage } from "./RecordCoverImage";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 interface AddToShelfModalProps {
   isOpen: boolean;
   onClose: () => void;
   record: RecordScanResult | null;
   existingItem?: ShelfItem | null;
+  boxes: VinylBox[];
   onSave: (item: ShelfItem) => void;
 }
 
@@ -19,6 +21,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
   onClose,
   record,
   existingItem,
+  boxes,
   onSave,
 }) => {
   const [mediaGrade, setMediaGrade] = useState<GoldmineGrade>("VG+");
@@ -37,9 +40,17 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
   const [customNotes, setCustomNotes] = useState<string>("");
   const [customValuationAdj, setCustomValuationAdj] = useState<string>("0");
   const [coverArtUrl, setCoverArtUrl] = useState<string>("");
+  const [genre, setGenre] = useState<string>(DISCOGS_MACRO_GENRES[0]);
+  const [styles, setStyles] = useState<string[]>([]);
+  const [styleInput, setStyleInput] = useState<string>("");
+  const [boxId, setBoxId] = useState<string>(UNCATEGORISED_BOX_ID);
 
   useEffect(() => {
     if (existingItem) {
+      const normG = normalizeDiscogsGenre(existingItem.genre, existingItem.styles);
+      setGenre(normG.genre);
+      setStyles(normG.styles);
+      setBoxId(existingItem.boxId || UNCATEGORISED_BOX_ID);
       setCoverArtUrl(existingItem.coverArtUrl || "");
       setMediaGrade(existingItem.mediaGrade || "VG+");
       setSleeveGrade(existingItem.sleeveGrade || "VG+");
@@ -57,6 +68,10 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
       setCustomNotes(existingItem.customNotes || existingItem.freeTextNotes || "");
       setCustomValuationAdj("0");
     } else if (record) {
+      const normG = normalizeDiscogsGenre(record.genre, record.styles);
+      setGenre(normG.genre);
+      setStyles(normG.styles);
+      setBoxId((record as any).boxId || UNCATEGORISED_BOX_ID);
       setCoverArtUrl(record.coverArtUrl || "");
       setMediaGrade((record as any).mediaGrade || "VG+");
       setSleeveGrade((record as any).sleeveGrade || "VG+");
@@ -93,6 +108,8 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
     }
   }, [existingItem, record, isOpen]);
 
+  useEscapeToClose(isOpen, onClose);
+
   if (!isOpen || (!record && !existingItem)) return null;
 
   const activeRecord = existingItem || record!;
@@ -120,12 +137,30 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
     }));
   };
 
+  const addStyle = () => {
+    const trimmed = styleInput.trim();
+    if (!trimmed || styles.length >= 3) return;
+    if (styles.some((s) => s.toLowerCase() === trimmed.toLowerCase())) {
+      setStyleInput("");
+      return;
+    }
+    setStyles((prev) => [...prev, trimmed]);
+    setStyleInput("");
+  };
+
+  const removeStyle = (style: string) => {
+    setStyles((prev) => prev.filter((s) => s !== style));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     const shelfPayload: ShelfItem = {
       ...activeRecord,
       coverArtUrl: coverArtUrl || activeRecord.coverArtUrl,
+      genre,
+      styles,
+      boxId,
       mediaGrade,
       sleeveGrade,
       obiCondition,
@@ -144,8 +179,14 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto animate-fade-in">
-      <div className="relative w-full max-w-lg my-8 rounded-xl bg-[#FAF8F3] border border-[#E2DCD0] shadow-2xl overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-lg my-8 rounded-xl bg-[#FAF8F3] border border-[#E2DCD0] shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#E2DCD0] bg-[#EFEAE0]">
           <div className="flex items-center gap-3">
@@ -203,21 +244,87 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
                 )}
               </div>
 
-              {(() => {
-                const normG = normalizeDiscogsGenre(activeRecord.genre, activeRecord.styles);
-                return (
-                  <div className="flex flex-wrap items-center gap-1 mt-1.5">
-                    <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#A94A42]/10 border border-[#A94A42]/20 text-[#A94A42]">
-                      {normG.genre}
+              <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#A94A42]/10 border border-[#A94A42]/20 text-[#A94A42]">
+                  {genre}
+                </span>
+                {styles.map((style, sIdx) => (
+                  <span key={sIdx} className="text-[9px] font-sans px-2 py-0.5 rounded-full bg-[#FAF8F3] border border-[#D8D0C0] text-[#2B2B2B]">
+                    {style}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Genre & Sub-Genre Categorization (editable) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-[#A94A42]" />
+                Genre
+              </label>
+              <select
+                value={genre}
+                onChange={(e) => setGenre(e.target.value)}
+                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] rounded-md px-3 py-2 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
+              >
+                {DISCOGS_MACRO_GENRES.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-[#A94A42]" />
+                Sub-Genres / Styles (up to 3)
+              </label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  placeholder={styles.length >= 3 ? "Max 3 styles" : "e.g. Prog Rock"}
+                  value={styleInput}
+                  disabled={styles.length >= 3}
+                  onChange={(e) => setStyleInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addStyle();
+                    }
+                  }}
+                  className="flex-1 min-w-0 bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] placeholder-[#8C857B] rounded-md px-3 py-2 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  onClick={addStyle}
+                  disabled={!styleInput.trim() || styles.length >= 3}
+                  className="shrink-0 p-2 rounded-md bg-[#A94A42] hover:bg-[#8E3E37] text-white transition disabled:opacity-40 cursor-pointer"
+                  title="Add Style"
+                >
+                  <Plus className="w-3.5 h-3.5 text-white" />
+                </button>
+              </div>
+              {styles.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {styles.map((style) => (
+                    <span
+                      key={style}
+                      className="inline-flex items-center gap-1 text-[10px] font-sans px-2 py-0.5 rounded-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B]"
+                    >
+                      {style}
+                      <button
+                        type="button"
+                        onClick={() => removeStyle(style)}
+                        className="hover:text-[#A94A42] transition cursor-pointer"
+                        title="Remove style"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     </span>
-                    {normG.styles.map((style, sIdx) => (
-                      <span key={sIdx} className="text-[9px] font-sans px-2 py-0.5 rounded-full bg-[#FAF8F3] border border-[#D8D0C0] text-[#2B2B2B]">
-                        {style}
-                      </span>
-                    ))}
-                  </div>
-                );
-              })()}
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -348,6 +455,24 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
                 className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] placeholder-[#8C857B] font-sans rounded-md px-3 py-2 text-xs focus:outline-none focus:border-[#A94A42] transition"
               />
             </div>
+          </div>
+
+          {/* Organise Box Selector */}
+          <div>
+            <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center gap-1">
+              <Package className="w-3.5 h-3.5 text-[#A94A42]" />
+              Storage Box (Organise)
+            </label>
+            <select
+              value={boxId}
+              onChange={(e) => setBoxId(e.target.value)}
+              className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] rounded-md px-3 py-2 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
+            >
+              <option value={UNCATEGORISED_BOX_ID}>Uncategorised</option>
+              {boxes.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Aggregated Custom Notes / Pressing Particulars */}

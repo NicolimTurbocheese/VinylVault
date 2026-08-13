@@ -8,7 +8,6 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { getDb } from "./firebase";
-import { ShelfItem } from "../types";
 
 const VAULT_CODE_KEY = "vinylvault_vault_code";
 
@@ -43,51 +42,65 @@ export function normalizeVaultCode(raw: string): string {
   return raw.trim().replace(/\s+/g, "");
 }
 
-function itemsCollectionRef(vaultCode: string) {
+// Every synced record type (shelf items, boxes, ...) lives in its own subcollection
+// under the same vault: /vaults/{vaultCode}/{collectionName}/{docId}.
+function collectionRef(vaultCode: string, collectionName: string) {
   const db = getDb();
   if (!db) return null;
-  return collection(db, "vaults", vaultCode, "shelfItems");
+  return collection(db, "vaults", vaultCode, collectionName);
 }
 
-export function subscribeToVault(
+export function subscribeToVaultCollection<T extends { id: string }>(
   vaultCode: string,
-  onItems: (items: ShelfItem[]) => void,
+  collectionName: string,
+  onItems: (items: T[]) => void,
   onError: (err: unknown) => void
 ): Unsubscribe | null {
-  const col = itemsCollectionRef(vaultCode);
+  const col = collectionRef(vaultCode, collectionName);
   if (!col) return null;
   return onSnapshot(
     col,
     (snapshot) => {
-      onItems(snapshot.docs.map((d) => d.data() as ShelfItem));
+      onItems(snapshot.docs.map((d) => d.data() as T));
     },
     onError
   );
 }
 
-export async function fetchVaultItemsOnce(vaultCode: string): Promise<ShelfItem[]> {
-  const col = itemsCollectionRef(vaultCode);
+export async function fetchVaultCollectionOnce<T extends { id: string }>(
+  vaultCode: string,
+  collectionName: string
+): Promise<T[]> {
+  const col = collectionRef(vaultCode, collectionName);
   if (!col) return [];
   const snap = await getDocs(col);
-  return snap.docs.map((d) => d.data() as ShelfItem);
+  return snap.docs.map((d) => d.data() as T);
 }
 
-export async function upsertVaultItem(vaultCode: string, item: ShelfItem) {
+export async function upsertVaultDoc<T extends { id: string }>(
+  vaultCode: string,
+  collectionName: string,
+  item: T
+) {
   const db = getDb();
   if (!db) return;
-  await setDoc(doc(db, "vaults", vaultCode, "shelfItems", item.id), item);
+  await setDoc(doc(db, "vaults", vaultCode, collectionName, item.id), item);
 }
 
-export async function deleteVaultItem(vaultCode: string, id: string) {
+export async function deleteVaultDoc(vaultCode: string, collectionName: string, id: string) {
   const db = getDb();
   if (!db) return;
-  await deleteDoc(doc(db, "vaults", vaultCode, "shelfItems", id));
+  await deleteDoc(doc(db, "vaults", vaultCode, collectionName, id));
 }
 
-export async function bulkUpsertVaultItems(vaultCode: string, items: ShelfItem[]) {
+export async function bulkUpsertVaultDocs<T extends { id: string }>(
+  vaultCode: string,
+  collectionName: string,
+  items: T[]
+) {
   const db = getDb();
   if (!db) return;
   await Promise.all(
-    items.map((item) => setDoc(doc(db, "vaults", vaultCode, "shelfItems", item.id), item))
+    items.map((item) => setDoc(doc(db, "vaults", vaultCode, collectionName, item.id), item))
   );
 }

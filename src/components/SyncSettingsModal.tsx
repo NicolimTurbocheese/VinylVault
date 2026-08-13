@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Cloud, CloudOff, Copy, Check, X, Link2, AlertTriangle, Loader2 } from "lucide-react";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 export type SyncStatus = "disabled" | "connecting" | "connected" | "error";
 
@@ -29,6 +30,8 @@ export const SyncSettingsModal: React.FC<SyncSettingsModalProps> = ({
   const [joinCodeInput, setJoinCodeInput] = useState("");
   const [copied, setCopied] = useState(false);
 
+  useEscapeToClose(isOpen, onClose);
+
   if (!isOpen) return null;
 
   const handleCopy = async () => {
@@ -43,8 +46,14 @@ export const SyncSettingsModal: React.FC<SyncSettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-      <div className="bg-[#18181b] text-zinc-100 border border-[#8FA89B]/30 rounded-xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#18181b] text-zinc-100 border border-[#8FA89B]/30 rounded-xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 transition"

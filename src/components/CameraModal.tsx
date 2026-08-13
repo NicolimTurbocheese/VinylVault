@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Camera, X, RefreshCw, CheckCircle } from "lucide-react";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
 interface CameraModalProps {
   isOpen: boolean;
@@ -17,6 +18,13 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const handleClose = () => {
+    stopCamera();
+    onClose();
+  };
+
+  useEscapeToClose(isOpen, handleClose);
 
   useEffect(() => {
     if (isOpen) {
@@ -80,8 +88,14 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+      onClick={handleClose}
+    >
+      <div
+        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/60">
           <div className="flex items-center gap-2 text-amber-400 font-semibold text-lg">
@@ -89,10 +103,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
             <span>Snap Vinyl Record / Runout Groove</span>
           </div>
           <button
-            onClick={() => {
-              stopCamera();
-              onClose();
-            }}
+            onClick={handleClose}
             className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
           >
             <X className="w-5 h-5" />
@@ -101,6 +112,15 @@ export const CameraModal: React.FC<CameraModalProps> = ({
 
         {/* Video stream container */}
         <div className="relative aspect-square sm:aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
+          {/* Floating close button — always reachable even if the header scrolls out of view on small screens */}
+          <button
+            onClick={handleClose}
+            title="Close (Esc)"
+            className="absolute top-3 right-3 z-10 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 backdrop-blur-sm transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
           {errorMsg ? (
             <div className="p-6 text-center text-zinc-400">
               <p className="text-red-400 mb-2">{errorMsg}</p>

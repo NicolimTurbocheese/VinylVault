@@ -173,7 +173,19 @@ export interface ShelfItem extends RecordScanResult {
   physicalShelfLocation?: string;
   customNotes?: string;
   addedAt: string;
+  // Which physical storage Box this record is filed in (Organise tab). Missing/unknown
+  // box id means it falls into the virtual "Uncategorised" box.
+  boxId?: string;
 }
+
+// A user-defined physical storage location (e.g. "Crate 2", "Living Room Shelf A").
+export interface VinylBox {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+export const UNCATEGORISED_BOX_ID = "uncategorised";
 
 export interface SearchQueryParams {
   catalogueNumber?: string;
