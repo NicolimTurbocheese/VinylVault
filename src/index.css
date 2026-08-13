@@ -2,32 +2,107 @@
 
 @layer base {
   :root {
-    --bg-canvas: #F4EFEB;
-    --bg-surface: #FAF8F3;
-    --bg-surface-alt: #EFEAE0;
-    --text-primary: #2B2B2B;
-    --text-muted: #6B655B;
-    --accent-terracotta: #A94A42;
-    --accent-terracotta-hover: #8E3E37;
-    --sage-bg: #8FA89B;
-    --sage-text: #2D4A3E;
-    --border-warm: #E2DCD0;
+    --vv-bg: #F4EFEB;
+    --vv-bg-grad-1: rgba(244, 239, 235, 1);
+    --vv-bg-grad-2: rgba(236, 229, 219, 0.7);
+    --vv-surface: #FAF8F3;
+    --vv-surface-2: #EFEAE0;
+    --vv-border: #E2DCD0;
+    --vv-border-2: #D8D0C0;
+    --vv-text: #2B2B2B;
+    --vv-text-muted: #6B655B;
+    --vv-text-faint: #8C857B;
+    --vv-accent: #A94A42;
+    --vv-accent-hover: #8E3E37;
+    --vv-accent-rgb: 169, 74, 66;
+    --vv-secondary: #8FA89B;
+    --vv-secondary-rgb: 143, 168, 155;
+    --vv-secondary-text: #2D4A3E;
+    --vv-error-bg: #FDF2F0;
+    --vv-error-text: #8E3E37;
+  }
+
+  /* Look 1: Tokyo & Nordic Archival Salon — warm oatmeal paper, terracotta vermilion */
+  .theme-nordic {
+    --vv-bg: #F4EFE6;
+    --vv-bg-grad-1: rgba(244, 239, 230, 1);
+    --vv-bg-grad-2: rgba(234, 227, 214, 0.7);
+    --vv-surface: #FFFFFF;
+    --vv-surface-2: #EAE3D6;
+    --vv-border: #DCD3C0;
+    --vv-border-2: #CFC3AC;
+    --vv-text: #1A1816;
+    --vv-text-muted: #6B6055;
+    --vv-text-faint: #948A7A;
+    --vv-accent: #C85A32;
+    --vv-accent-hover: #A84826;
+    --vv-accent-rgb: 200, 90, 50;
+    --vv-secondary: #8FA89B;
+    --vv-secondary-rgb: 143, 168, 155;
+    --vv-secondary-text: #2D4A3E;
+    --vv-error-bg: #FBEEE9;
+    --vv-error-text: #A84826;
+  }
+
+  /* Look 2: Zurich Modernist Precision Grid — ice slate, royal cobalt blue */
+  .theme-swiss {
+    --vv-bg: #EBF0F6;
+    --vv-bg-grad-1: rgba(235, 240, 246, 1);
+    --vv-bg-grad-2: rgba(220, 230, 240, 0.7);
+    --vv-surface: #FFFFFF;
+    --vv-surface-2: #DCE6F0;
+    --vv-border: #C7D6E5;
+    --vv-border-2: #B3C6D9;
+    --vv-text: #090D16;
+    --vv-text-muted: #4B5A6B;
+    --vv-text-faint: #7C8CA0;
+    --vv-accent: #1D4ED8;
+    --vv-accent-hover: #1839A8;
+    --vv-accent-rgb: 29, 78, 216;
+    --vv-secondary: #64748B;
+    --vv-secondary-rgb: 100, 116, 139;
+    --vv-secondary-text: #1E293B;
+    --vv-error-bg: #FEECEC;
+    --vv-error-text: #B91C1C;
+  }
+
+  /* Look 3: Neo-Tokyo Cyber Studio — midnight sapphire, electric mint emerald */
+  .theme-cyber {
+    --vv-bg: #050811;
+    --vv-bg-grad-1: rgba(5, 8, 17, 1);
+    --vv-bg-grad-2: rgba(13, 21, 39, 0.7);
+    --vv-surface: #0D1527;
+    --vv-surface-2: #131C33;
+    --vv-border: #1E2A45;
+    --vv-border-2: #293857;
+    --vv-text: #ECFDF5;
+    --vv-text-muted: #94A3B8;
+    --vv-text-faint: #64748B;
+    --vv-accent: #10B981;
+    --vv-accent-hover: #0D9668;
+    --vv-accent-rgb: 16, 185, 129;
+    --vv-secondary: #22D3EE;
+    --vv-secondary-rgb: 34, 211, 238;
+    --vv-secondary-text: #A5F3FC;
+    --vv-error-bg: #2A1214;
+    --vv-error-text: #FCA5A5;
   }
 
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background-color: #F4EFEB !important;
-    color: #2B2B2B !important;
-    background-image: 
-      radial-gradient(at 10% 10%, rgba(244, 239, 235, 1) 0px, transparent 50%),
-      radial-gradient(at 90% 90%, rgba(236, 229, 219, 0.7) 0px, transparent 50%),
-      repeating-linear-gradient(0deg, rgba(169, 74, 66, 0.008) 0px, rgba(169, 74, 66, 0.008) 1px, transparent 1px, transparent 12px);
+    background-color: var(--vv-bg) !important;
+    color: var(--vv-text) !important;
+    background-image:
+      radial-gradient(at 10% 10%, var(--vv-bg-grad-1) 0px, transparent 50%),
+      radial-gradient(at 90% 90%, var(--vv-bg-grad-2) 0px, transparent 50%),
+      repeating-linear-gradient(0deg, rgba(var(--vv-accent-rgb), 0.008) 0px, rgba(var(--vv-accent-rgb), 0.008) 1px, transparent 1px, transparent 12px);
     background-attachment: fixed;
+    transition: background-color 0.35s ease, color 0.25s ease;
   }
-  
+
   .font-serif, h1, h2, h3, h4 {
     font-family: 'Fraunces', Georgia, serif !important;
-    color: #2B2B2B !important;
+    color: var(--vv-text) !important;
   }
 
   .font-sans, .font-mono {
@@ -36,10 +111,14 @@
 }
 
 /* =========================================================
-   UI/UX DESIGN SYSTEM OVERRIDES (MATCHING ATTACHED REFERENCE)
+   UI/UX DESIGN SYSTEM OVERRIDES
+   Every hardcoded color a component might use (light or dark,
+   leftover from earlier design passes) is normalized here to the
+   active theme's tokens. This is what makes theme switching work
+   app-wide without having to touch every component's className.
    ========================================================= */
 
-/* 1. Universal Containers & Cards (LIGHT CREAM / ALABASTER ONLY) */
+/* 1. Universal Containers & Cards */
 .bg-\[\#161616\],
 .bg-\[\#0c0c0c\],
 .bg-\[\#0C0C0C\],
@@ -50,6 +129,8 @@
 .bg-\[\#1A1A1A\],
 .bg-\[\#1C1A14\],
 .bg-\[\#181818\],
+.bg-\[\#FAF8F3\],
+.bg-\[\#F5F2EB\],
 .bg-zinc-900,
 .bg-zinc-950,
 .bg-zinc-800,
@@ -66,61 +147,71 @@
 .bg-emerald-950\/20,
 .bg-red-950\/20,
 .bg-amber-950\/20 {
-  background-color: #FAF8F3 !important;
-  border-color: #E2DCD0 !important;
-  color: #2B2B2B !important;
-  box-shadow: 0 2px 8px rgba(43, 43, 43, 0.04), 0 1px 3px rgba(43, 43, 43, 0.02) !important;
+  background-color: var(--vv-surface) !important;
+  border-color: var(--vv-border) !important;
+  color: var(--vv-text) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease;
 }
 
 /* Sub-containers & inner input backgrounds */
 .bg-\[\#0C0C0C\],
 .bg-\[\#0c0c0c\],
+.bg-\[\#EFEAE0\],
 .bg-black\/50,
 .bg-black\/60,
 .bg-black\/40 {
-  background-color: #EFEAE0 !important;
-  border-color: #E2DCD0 !important;
-  color: #2B2B2B !important;
+  background-color: var(--vv-surface-2) !important;
+  border-color: var(--vv-border) !important;
+  color: var(--vv-text) !important;
 }
 
-/* 2. Bottom Bar / Footer Styling */
+/* 2. Bottom Bar / Footer / Header */
 footer {
-  background-color: #FAF8F3 !important;
-  border-top: 1px solid #E2DCD0 !important;
-  color: #6B655B !important;
+  background-color: var(--vv-surface) !important;
+  border-top: 1px solid var(--vv-border) !important;
+  color: var(--vv-text-muted) !important;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease;
 }
 
 header {
-  background-color: rgba(244, 239, 235, 0.95) !important;
-  border-bottom: 1px solid #E2DCD0 !important;
+  background-color: color-mix(in srgb, var(--vv-bg) 95%, transparent) !important;
+  border-bottom: 1px solid var(--vv-border) !important;
   backdrop-filter: blur(10px) !important;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
-/* 3. Text Colors (Charcoal Primary, Terracotta Accents) */
+/* 3. Text Colors */
+.text-\[\#2B2B2B\],
 .text-white:not(input):not(textarea):not(select):not(button):not(a):not(span.bg-\[\#A94A42\]) {
-  color: #FFFFFF !important;
+  color: var(--vv-text) !important;
 }
 
 .text-zinc-100,
 .text-zinc-200,
 .text-zinc-300,
 .text-amber-200 {
-  color: #2B2B2B !important;
+  color: var(--vv-text) !important;
 }
 
+.text-\[\#6B655B\],
 .text-zinc-400,
 .text-zinc-500,
 .text-zinc-600 {
-  color: #6B655B !important;
+  color: var(--vv-text-muted) !important;
 }
 
 .text-\[\#D4AF37\],
 .text-\[\#FFBF00\],
 .text-amber-500,
 .text-gold-gradient {
-  color: #A94A42 !important;
+  color: var(--vv-accent) !important;
   background: none !important;
   -webkit-text-fill-color: initial !important;
+}
+
+.text-\[\#A94A42\] {
+  color: var(--vv-accent) !important;
 }
 
 /* 4. Borders */
@@ -130,6 +221,8 @@ header {
 .border-\[\#D4AF37\]\/30,
 .border-\[\#D4AF37\]\/40,
 .border-\[\#D4AF37\]\/50,
+.border-\[\#E2DCD0\],
+.border-\[\#D8D0C0\],
 .border-zinc-800,
 .border-zinc-700,
 .border-zinc-800\/80,
@@ -138,19 +231,20 @@ header {
 .border-white\/15,
 .border-white\/20,
 .border-white\/30 {
-  border-color: #E2DCD0 !important;
+  border-color: var(--vv-border) !important;
 }
 
-/* 5. Terracotta Action Buttons (Muted Rust Red #A94A42) */
+/* 5. Accent Action Buttons */
 .bg-\[\#A94A42\],
 .bg-\[\#8E3E37\],
 .bg-\[\#D4AF37\],
 .bg-amber-500,
 .bg-\[\#FFBF00\] {
-  background-color: #A94A42 !important;
+  background-color: var(--vv-accent) !important;
   color: #FFFFFF !important;
   border-radius: 8px !important;
   border: none !important;
+  transition: background-color 0.2s ease, transform 0.15s ease;
 }
 
 .bg-\[\#A94A42\] *,
@@ -165,16 +259,17 @@ header {
 .bg-amber-500:hover,
 .bg-\[\#FFBF00\]:hover,
 .bg-\[\#A94A42\]:hover {
-  background-color: #8E3E37 !important;
+  background-color: var(--vv-accent-hover) !important;
   color: #FFFFFF !important;
+  transform: translateY(-1px);
 }
 
 /* Secondary CTA buttons (Choose File, Live Camera, etc.) */
 .bg-black.text-\[\#D4AF37\],
 .bg-black.text-zinc-300 {
-  background-color: #A94A42 !important;
+  background-color: var(--vv-accent) !important;
   color: #FFFFFF !important;
-  border-color: #A94A42 !important;
+  border-color: var(--vv-accent) !important;
   border-radius: 8px !important;
 }
 
@@ -185,11 +280,12 @@ header {
 
 .bg-black.text-\[\#D4AF37\]:hover,
 .bg-black.text-zinc-300:hover {
-  background-color: #8E3E37 !important;
+  background-color: var(--vv-accent-hover) !important;
   color: #FFFFFF !important;
 }
 
-/* 6. System Indicators & Pressing Confirmation Badges (Sage Green Capsule) */
+/* 6. System Indicators & Confirmation Badges */
+.bg-\[\#8FA89B\],
 .bg-emerald-500\/10,
 .bg-emerald-500\/15,
 .bg-emerald-500\/20,
@@ -197,20 +293,21 @@ header {
 .bg-green-500\/20,
 .bg-sage-badge,
 .badge-sage {
-  background-color: rgba(143, 168, 155, 0.35) !important;
-  color: #2D4A3E !important;
-  border: 1px solid rgba(143, 168, 155, 0.6) !important;
+  background-color: rgba(var(--vv-secondary-rgb), 0.35) !important;
+  color: var(--vv-secondary-text) !important;
+  border: 1px solid rgba(var(--vv-secondary-rgb), 0.6) !important;
   border-radius: 9999px !important;
   padding-left: 0.75rem !important;
   padding-right: 0.75rem !important;
 }
 
+.text-\[\#2D4A3E\],
 .text-emerald-400,
 .text-emerald-500,
 .text-green-400,
 .text-green-500,
 .text-sage-text {
-  color: #2D4A3E !important;
+  color: var(--vv-secondary-text) !important;
 }
 
 /* 6b. Error Alerts & Callouts */
@@ -218,43 +315,44 @@ header {
 .bg-red-500\/20,
 .bg-red-950\/40,
 .bg-red-950\/20 {
-  background-color: #FDF2F0 !important;
-  border-color: rgba(169, 74, 66, 0.35) !important;
-  color: #8E3E37 !important;
+  background-color: var(--vv-error-bg) !important;
+  border-color: rgba(var(--vv-accent-rgb), 0.35) !important;
+  color: var(--vv-error-text) !important;
 }
 
 .text-red-400,
 .text-red-500,
 .text-red-300,
 .text-red-600 {
-  color: #8E3E37 !important;
+  color: var(--vv-error-text) !important;
 }
 
 /* 7. Form Inputs & Textareas */
 input, textarea, select,
 input[type="text"], input[type="number"], input[type="search"],
 input.text-white, textarea.text-white, select.text-white {
-  background-color: #EFEAE0 !important;
-  color: #2B2B2B !important;
-  -webkit-text-fill-color: #2B2B2B !important;
-  border: 1px solid #D8D0C0 !important;
+  background-color: var(--vv-surface-2) !important;
+  color: var(--vv-text) !important;
+  -webkit-text-fill-color: var(--vv-text) !important;
+  border: 1px solid var(--vv-border-2) !important;
   border-radius: 8px !important;
   font-family: 'Inter', -apple-system, sans-serif !important;
+  transition: background-color 0.3s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 input:focus, textarea:focus, select:focus {
-  border-color: #A94A42 !important;
+  border-color: var(--vv-accent) !important;
   outline: none !important;
-  box-shadow: 0 0 0 2px rgba(169, 74, 66, 0.15) !important;
+  box-shadow: 0 0 0 2px rgba(var(--vv-accent-rgb), 0.15) !important;
 }
 
 input::placeholder, textarea::placeholder {
-  color: #8C857B !important;
-  -webkit-text-fill-color: #8C857B !important;
+  color: var(--vv-text-faint) !important;
+  -webkit-text-fill-color: var(--vv-text-faint) !important;
   opacity: 1 !important;
 }
 
-/* 8. Camera Lens / Viewfinder Exception (Keep black inside camera viewport only) */
+/* 8. Camera Lens / Viewfinder Exception (keep black inside camera viewport only) */
 .video-preview, video, .camera-viewport {
   background-color: #000000 !important;
 }
@@ -263,15 +361,30 @@ input::placeholder, textarea::placeholder {
 .bg-black\/80.backdrop-blur-md,
 .fixed.inset-0.bg-black\/70,
 .fixed.inset-0.bg-black\/80 {
-  background-color: rgba(43, 43, 43, 0.4) !important;
+  background-color: rgba(0, 0, 0, 0.4) !important;
   backdrop-filter: blur(6px) !important;
 }
 
 /* Modal Inner Box */
 .modal-content, [role="dialog"] {
-  background-color: #FAF8F3 !important;
-  border: 1px solid #E2DCD0 !important;
-  color: #2B2B2B !important;
+  background-color: var(--vv-surface) !important;
+  border: 1px solid var(--vv-border) !important;
+  color: var(--vv-text) !important;
+}
+
+/* Keyboard focus visibility, app-wide */
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--vv-accent) !important;
+  outline-offset: 2px !important;
+}
+
+/* Subtle tactile lift on interactive cards */
+@media (prefers-reduced-motion: no-preference) {
+  .hover\:border-\[\#A94A42\]\/40:hover,
+  .hover\:border-\[\#8FA89B\]\/50:hover {
+    transform: translateY(-2px);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+  }
 }
 
 /* Animations */
@@ -291,4 +404,13 @@ input::placeholder, textarea::placeholder {
 
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
