@@ -8,6 +8,7 @@ interface HeaderProps {
   isSyncing: boolean;
   onOpenSync: () => void;
   onOpenTheme: () => void;
+  onOpenCommandPalette: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,6 +18,7 @@ export const Header: React.FC<HeaderProps> = ({
   isSyncing,
   onOpenSync,
   onOpenTheme,
+  onOpenCommandPalette,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-[#F5F2EB]/95 backdrop-blur-md border-b border-[#E2DCD0]">
@@ -122,6 +124,15 @@ export const Header: React.FC<HeaderProps> = ({
               className="p-2 rounded-md text-[#6B655B] border border-transparent hover:text-[#A94A42] hover:bg-[#E2DCD0]/30 transition-all"
             >
               <Palette className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              onClick={onOpenCommandPalette}
+              title="Quick search & navigate"
+              className="hidden md:flex items-center gap-1.5 py-1.5 px-2.5 rounded-md border border-[#D8D0C0] text-[#6B655B] hover:text-[#2B2B2B] hover:border-[#A94A42]/40 bg-[#EFEAE0]/60 transition-all"
+            >
+              <Search className="w-3 h-3" />
+              <kbd className="text-[10px] font-mono font-bold">⌘K</kbd>
             </button>
           </nav>
         </div>

@@ -24,6 +24,7 @@ import {
   Legend
 } from "recharts";
 import { ShelfItem } from "../types";
+import { useCountUp } from "../hooks/useCountUp";
 
 interface CollectionInsightsTabProps {
   shelfItems: ShelfItem[];
@@ -34,6 +35,25 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
   shelfItems,
   onGoToScan,
 }) => {
+  // Portfolio totals computed unconditionally (even when empty, reduce()
+  // just yields 0) so the count-up hooks below can be called before any
+  // early return, keeping hook order stable across renders.
+  const totalCount = shelfItems.length;
+  const totalLow = shelfItems.reduce((sum, item) => sum + (item.calculatedValue?.low || 0), 0);
+  const totalMedian = shelfItems.reduce((sum, item) => sum + (item.calculatedValue?.median || 0), 0);
+  const totalHigh = shelfItems.reduce((sum, item) => sum + (item.calculatedValue?.high || 0), 0);
+  const totalInvestment = shelfItems.reduce((sum, item) => sum + (item.purchasePrice || 0), 0);
+  const itemsWithPrice = shelfItems.filter((i) => i.purchasePrice !== undefined && i.purchasePrice > 0);
+  const totalCostKnown = itemsWithPrice.reduce((sum, item) => sum + (item.purchasePrice || 0), 0);
+  const totalValKnown = itemsWithPrice.reduce((sum, item) => sum + (item.calculatedValue?.median || 0), 0);
+  const netGain = totalValKnown - totalCostKnown;
+  const avgRecordValue = totalCount > 0 ? Math.round(totalMedian / totalCount) : 0;
+
+  const animatedTotalMedian = Math.round(useCountUp(totalMedian));
+  const animatedAvgValue = Math.round(useCountUp(avgRecordValue));
+  const animatedInvestment = Math.round(useCountUp(totalInvestment));
+  const animatedNetGain = Math.round(useCountUp(netGain));
+
   if (!shelfItems || shelfItems.length === 0) {
     return (
       <div className="p-12 text-center rounded-lg bg-[#161616] border border-[#D4AF37]/20 max-w-md mx-auto space-y-4 my-8 shadow-2xl">
@@ -54,22 +74,6 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
       </div>
     );
   }
-
-  // 1. Overall Portfolio Metrics
-  const totalCount = shelfItems.length;
-
-  const totalLow = shelfItems.reduce((sum, item) => sum + (item.calculatedValue?.low || 0), 0);
-  const totalMedian = shelfItems.reduce((sum, item) => sum + (item.calculatedValue?.median || 0), 0);
-  const totalHigh = shelfItems.reduce((sum, item) => sum + (item.calculatedValue?.high || 0), 0);
-
-  const totalInvestment = shelfItems.reduce((sum, item) => sum + (item.purchasePrice || 0), 0);
-  const avgRecordValue = Math.round(totalMedian / totalCount);
-
-  // Profit/Loss estimate if purchase price was entered
-  const itemsWithPrice = shelfItems.filter((i) => i.purchasePrice !== undefined && i.purchasePrice > 0);
-  const totalCostKnown = itemsWithPrice.reduce((sum, item) => sum + (item.purchasePrice || 0), 0);
-  const totalValKnown = itemsWithPrice.reduce((sum, item) => sum + (item.calculatedValue?.median || 0), 0);
-  const netGain = totalValKnown - totalCostKnown;
 
   // 2. Data for Valuation Range Chart
   const valuationBarData = [
@@ -126,8 +130,8 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
           <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400 block">
             Portfolio Total Value
           </span>
-          <div className="text-2xl font-serif font-bold text-[#FFBF00] mt-1">
-            S${totalMedian.toLocaleString()}
+          <div className="text-2xl font-serif font-bold text-[#FFBF00] mt-1 tabular-nums">
+            S${animatedTotalMedian.toLocaleString()}
           </div>
           <span className="text-[10px] font-mono text-zinc-500 block mt-1">
             Est: S${totalLow.toLocaleString()} - S${totalHigh.toLocaleString()}
@@ -138,8 +142,8 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
           <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400 block">
             Average Value / Album
           </span>
-          <div className="text-2xl font-serif font-bold text-white mt-1">
-            S${avgRecordValue}
+          <div className="text-2xl font-serif font-bold text-white mt-1 tabular-nums">
+            S${animatedAvgValue}
           </div>
           <span className="text-[10px] font-mono text-[#D4AF37] block mt-1">
             Across {totalCount} Catalogued Albums
@@ -150,8 +154,8 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
           <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400 block">
             Logged Purchase Cost
           </span>
-          <div className="text-2xl font-serif font-bold text-zinc-300 mt-1">
-            S${totalInvestment.toLocaleString()}
+          <div className="text-2xl font-serif font-bold text-zinc-300 mt-1 tabular-nums">
+            S${animatedInvestment.toLocaleString()}
           </div>
           <span className="text-[10px] font-mono text-zinc-500 block mt-1">
             {itemsWithPrice.length} items logged
@@ -163,8 +167,8 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
             <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
             Estimated Value Gain
           </span>
-          <div className={`text-2xl font-serif font-bold mt-1 ${netGain >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-            {netGain >= 0 ? `+S$${netGain.toLocaleString()}` : `-S$${Math.abs(netGain).toLocaleString()}`}
+          <div className={`text-2xl font-serif font-bold mt-1 tabular-nums ${netGain >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+            {netGain >= 0 ? `+S$${animatedNetGain.toLocaleString()}` : `-S$${Math.abs(animatedNetGain).toLocaleString()}`}
           </div>
           <span className="text-[10px] font-mono text-zinc-500 block mt-1">
             Based on logged prices

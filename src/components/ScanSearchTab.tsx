@@ -766,6 +766,31 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
         </form>
       </div>
 
+      {/* Skeleton preview while a search is in flight */}
+      {isLoading && !scanResult && (
+        <div className="rounded-lg bg-[#161616] border border-[#D4AF37]/20 p-6 sm:p-8 shadow-2xl space-y-6 animate-fade-in">
+          <div className="flex flex-col sm:flex-row gap-6">
+            <div className="w-full max-w-xs aspect-square rounded-lg mx-auto sm:mx-0 skeleton-shimmer shrink-0" />
+            <div className="flex-1 space-y-3 w-full">
+              <div className="h-3 w-24 rounded skeleton-shimmer" />
+              <div className="h-7 w-3/4 rounded skeleton-shimmer" />
+              <div className="h-4 w-1/2 rounded skeleton-shimmer" />
+              <div className="h-4 w-2/3 rounded skeleton-shimmer" />
+              <div className="flex gap-2 pt-2">
+                <div className="h-5 w-16 rounded-full skeleton-shimmer" />
+                <div className="h-5 w-20 rounded-full skeleton-shimmer" />
+              </div>
+              <div className="h-10 w-full rounded skeleton-shimmer mt-4" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-14 rounded skeleton-shimmer" />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Verify Exact Pressing Toggle (Deep Dive) Banner if multiple pressing variants found */}
       {scanResult &&
         !matrixPromptBypassed &&

@@ -8,6 +8,8 @@ import { OrganiseTab } from "./components/OrganiseTab";
 import { ThemeSelectorModal, UITheme } from "./components/ThemeSelectorModal";
 import { SyncSettingsModal, SyncStatus } from "./components/SyncSettingsModal";
 import { ToastStack, ToastMessage } from "./components/ToastStack";
+import { CommandPalette } from "./components/CommandPalette";
+import { Confetti } from "./components/Confetti";
 import { RecordScanResult, ShelfItem, VinylBox, UNCATEGORISED_BOX_ID } from "./types";
 import { calculateAdjustedValuation } from "./utils/valuation";
 import { cleanFormatSpec } from "./utils/format";
@@ -110,6 +112,7 @@ export default function App() {
 
   // Toast feedback
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [confettiTrigger, setConfettiTrigger] = useState(0);
   const showToast = (message: string, variant: "success" | "error" = "success") => {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     setToasts((prev) => [...prev, { id, message, variant }]);
@@ -124,6 +127,19 @@ export default function App() {
     return (localStorage.getItem("vinylvault_theme") as UITheme) || "gold";
   });
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+
+  // Cmd+K / Ctrl+K opens the command palette from anywhere in the app
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   // Cross-device sync state
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
@@ -346,6 +362,9 @@ export default function App() {
     saveShelfToLocal(updated);
     if (showFeedback) {
       showToast(existingIndex >= 0 ? `Updated "${item.albumTitle}"` : `Saved "${item.albumTitle}" to shelf`);
+      if (existingIndex < 0) {
+        setConfettiTrigger((n) => n + 1);
+      }
     }
 
     if (vaultCode && syncStatus === "connected") {
@@ -453,6 +472,7 @@ export default function App() {
         isSyncing={syncStatus === "connected"}
         onOpenSync={() => setIsSyncModalOpen(true)}
         onOpenTheme={() => setIsThemeModalOpen(true)}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -510,7 +530,6 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="flex items-center gap-1.5">
             <span className="font-serif font-bold text-[#A94A42]">VinylVault</span>
-            <span>— Powered by Gemini 3 Multimodal & Google Search Grounding</span>
           </p>
           <p className="text-[#6B655B] text-[11px]">
             Goldmine Grading Standard (M, NM, VG+, VG, G, F/P) Valuation Engine
@@ -553,8 +572,22 @@ export default function App() {
         onSelectTheme={setCurrentTheme}
       />
 
+      {/* Command Palette (Cmd/Ctrl+K) */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        shelfItems={shelfItems}
+        setActiveTab={setActiveTab}
+        onEditItem={handleOpenModalForEdit}
+        onOpenSync={() => setIsSyncModalOpen(true)}
+        onOpenTheme={() => setIsThemeModalOpen(true)}
+      />
+
       {/* Toast Notifications */}
       <ToastStack toasts={toasts} onDismiss={dismissToast} />
+
+      {/* Save Celebration */}
+      <Confetti trigger={confettiTrigger} />
     </div>
   );
 }

@@ -26,6 +26,7 @@ import { cleanFormatSpec } from "../utils/format";
 import { normalizeDiscogsGenre, DISCOGS_MACRO_GENRES } from "../utils/genre";
 import { RecordCoverImage } from "./RecordCoverImage";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
+import { useCountUp } from "../hooks/useCountUp";
 
 interface MyShelfTabProps {
   shelfItems: ShelfItem[];
@@ -92,6 +93,9 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
     (acc, item) => acc + (item.calculatedValue?.low || 0),
     0
   );
+
+  const animatedAlbums = Math.round(useCountUp(totalAlbums));
+  const animatedValueMedian = Math.round(useCountUp(totalValueMedian));
   const totalValueHigh = shelfItems.reduce(
     (acc, item) => acc + (item.calculatedValue?.high || 0),
     0
@@ -174,8 +178,8 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#6B655B] block">
               Total Collection
             </span>
-            <div className="text-3xl font-serif font-bold text-[#2B2B2B] mt-1">
-              {totalAlbums}
+            <div className="text-3xl font-serif font-bold text-[#2B2B2B] mt-1 tabular-nums">
+              {animatedAlbums}
             </div>
             <span className="text-[10px] font-sans text-[#6B655B]">
               Albums Scanned & Archived
@@ -192,8 +196,8 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#6B655B] block">
               Total Collection Value
             </span>
-            <div className="text-3xl font-serif font-bold text-[#2B2B2B] mt-1">
-              S${totalValueMedian.toLocaleString()}
+            <div className="text-3xl font-serif font-bold text-[#2B2B2B] mt-1 tabular-nums">
+              S${animatedValueMedian.toLocaleString()}
             </div>
             <span className="text-[10px] font-sans text-[#6B655B]">
               Est. Range: S${totalValueLow.toLocaleString()} - S${totalValueHigh.toLocaleString()}
@@ -409,7 +413,18 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
           {sortedItems.map((item) => (
             <div
               key={item.id}
-              className="rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] hover:border-[#A94A42]/40 p-5 shadow-sm transition flex flex-col justify-between group"
+              className="rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] hover:border-[#A94A42]/40 p-5 shadow-sm hover:shadow-lg transition flex flex-col justify-between group [transform-style:preserve-3d] will-change-transform"
+              onMouseMove={(e) => {
+                if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+                const card = e.currentTarget;
+                const rect = card.getBoundingClientRect();
+                const px = (e.clientX - rect.left) / rect.width - 0.5;
+                const py = (e.clientY - rect.top) / rect.height - 0.5;
+                card.style.transform = `perspective(900px) rotateX(${(-py * 6).toFixed(2)}deg) rotateY(${(px * 6).toFixed(2)}deg) translateY(-3px)`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "";
+              }}
             >
               <div className="space-y-4">
                 {/* Header with artwork */}

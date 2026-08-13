@@ -414,3 +414,28 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 .animate-scale-in {
   animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+@keyframes confettiBurst {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) rotate(var(--rot)); opacity: 0; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--vv-surface-2) 25%,
+    rgba(var(--vv-accent-rgb), 0.14) 50%,
+    var(--vv-surface-2) 75%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer { animation: none; }
+}
