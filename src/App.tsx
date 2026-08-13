@@ -1,14 +1,29 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Header } from "./components/Header";
 import { ScanSearchTab } from "./components/ScanSearchTab";
 import { MyShelfTab } from "./components/MyShelfTab";
 import { CollectionInsightsTab } from "./components/CollectionInsightsTab";
 import { AddToShelfModal } from "./components/AddToShelfModal";
 import { ThemeSelectorModal, UITheme } from "./components/ThemeSelectorModal";
+import { SyncSettingsModal, SyncStatus } from "./components/SyncSettingsModal";
 import { RecordScanResult, ShelfItem } from "./types";
 import { calculateAdjustedValuation } from "./utils/valuation";
 import { cleanFormatSpec } from "./utils/format";
 import { normalizeDiscogsGenre } from "./utils/genre";
+import { isFirebaseConfigured } from "./utils/firebase";
+import {
+  getStoredVaultCode,
+  storeVaultCode,
+  clearStoredVaultCode,
+  generateVaultCode,
+  normalizeVaultCode,
+  subscribeToVault,
+  fetchVaultItemsOnce,
+  upsertVaultItem,
+  deleteVaultItem,
+  bulkUpsertVaultItems,
+} from "./utils/vaultSync";
+import type { Unsubscribe } from "firebase/firestore";
 
 // Initial seed records if shelf is totally fresh
 const INITIAL_SEED_SHELF: ShelfItem[] = [
@@ -95,6 +110,13 @@ export default function App() {
   });
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
 
+  // Cross-device sync state
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [vaultCode, setVaultCode] = useState<string | null>(() => getStoredVaultCode());
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("disabled");
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const unsubscribeRef = useRef<Unsubscribe | null>(null);
+
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRecordForModal, setSelectedRecordForModal] = useState<RecordScanResult | null>(null);
@@ -112,6 +134,13 @@ export default function App() {
   // Load shelf items on mount from localStorage, falling back to the seed collection
   useEffect(() => {
     loadShelf();
+    if (vaultCode) {
+      connectToVault(vaultCode, { pushLocalOnConnect: false });
+    }
+    return () => {
+      unsubscribeRef.current?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const sanitizeShelfItem = (item: ShelfItem): ShelfItem => {
@@ -182,6 +211,69 @@ export default function App() {
     localStorage.setItem("vinylvault_shelf", JSON.stringify(cleanedItems));
   };
 
+  // Subscribes to a vault's live Firestore collection. When pushLocalOnConnect is true,
+  // any items already on this device that the vault doesn't have yet are uploaded first
+  // (used when linking a device for the first time), so nothing gets silently dropped.
+  const connectToVault = async (code: string, opts: { pushLocalOnConnect: boolean }) => {
+    setSyncStatus("connecting");
+    setSyncError(null);
+
+    if (opts.pushLocalOnConnect) {
+      try {
+        const remoteItems = await fetchVaultItemsOnce(code);
+        const remoteIds = new Set(remoteItems.map((i) => i.id));
+        const localOnly = shelfItems.filter((i) => !remoteIds.has(i.id));
+        if (localOnly.length > 0) {
+          await bulkUpsertVaultItems(code, localOnly.map(sanitizeShelfItem));
+        }
+      } catch (err) {
+        console.error("Failed to merge local items into vault:", err);
+        setSyncStatus("error");
+        setSyncError(err instanceof Error ? err.message : "Failed to reach the vault.");
+        return;
+      }
+    }
+
+    unsubscribeRef.current?.();
+    unsubscribeRef.current = subscribeToVault(
+      code,
+      (items) => {
+        saveShelfToLocal(items);
+        setSyncStatus("connected");
+        setSyncError(null);
+      },
+      (err) => {
+        console.error("Vault sync error:", err);
+        setSyncStatus("error");
+        setSyncError(err instanceof Error ? err.message : "Lost connection to the vault.");
+      }
+    );
+  };
+
+  const enableSyncNewVault = async () => {
+    const code = generateVaultCode();
+    storeVaultCode(code);
+    setVaultCode(code);
+    await connectToVault(code, { pushLocalOnConnect: true });
+  };
+
+  const joinVault = async (rawCode: string) => {
+    const code = normalizeVaultCode(rawCode);
+    if (!code) return;
+    storeVaultCode(code);
+    setVaultCode(code);
+    await connectToVault(code, { pushLocalOnConnect: true });
+  };
+
+  const disableSync = () => {
+    unsubscribeRef.current?.();
+    unsubscribeRef.current = null;
+    clearStoredVaultCode();
+    setVaultCode(null);
+    setSyncStatus("disabled");
+    setSyncError(null);
+  };
+
   const handleSaveToShelf = (item: ShelfItem) => {
     const existingIndex = shelfItems.findIndex((i) => i.id === item.id);
     let updated: ShelfItem[];
@@ -194,11 +286,23 @@ export default function App() {
     }
 
     saveShelfToLocal(updated);
+
+    if (vaultCode && syncStatus === "connected") {
+      upsertVaultItem(vaultCode, sanitizeShelfItem(item)).catch((err) => {
+        console.error("Failed to sync item to vault:", err);
+      });
+    }
   };
 
   const handleDeleteItem = (id: string) => {
     const updated = shelfItems.filter((item) => item.id !== id);
     saveShelfToLocal(updated);
+
+    if (vaultCode && syncStatus === "connected") {
+      deleteVaultItem(vaultCode, id).catch((err) => {
+        console.error("Failed to sync deletion to vault:", err);
+      });
+    }
   };
 
   const handleOpenModalForScan = (record: RecordScanResult) => {
@@ -223,6 +327,8 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         shelfCount={shelfItems.length}
+        isSyncing={syncStatus === "connected"}
+        onOpenSync={() => setIsSyncModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -286,6 +392,19 @@ export default function App() {
           setIsModalOpen(false);
           setActiveTab("shelf");
         }}
+      />
+
+      {/* Cross-Device Sync Modal */}
+      <SyncSettingsModal
+        isOpen={isSyncModalOpen}
+        onClose={() => setIsSyncModalOpen(false)}
+        isAvailable={isFirebaseConfigured()}
+        vaultCode={vaultCode}
+        status={syncStatus}
+        errorMessage={syncError}
+        onCreateVault={enableSyncNewVault}
+        onJoinVault={joinVault}
+        onDisableSync={disableSync}
       />
     </div>
   );

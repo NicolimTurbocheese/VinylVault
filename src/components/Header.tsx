@@ -1,16 +1,20 @@
 import React from "react";
-import { Search, Library, BarChart3, Disc3 } from "lucide-react";
+import { Search, Library, BarChart3, Disc3, Cloud, CloudOff } from "lucide-react";
 
 interface HeaderProps {
   activeTab: "scan" | "shelf" | "insights";
   setActiveTab: (tab: "scan" | "shelf" | "insights") => void;
   shelfCount: number;
+  isSyncing: boolean;
+  onOpenSync: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
   shelfCount,
+  isSyncing,
+  onOpenSync,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-[#F5F2EB]/95 backdrop-blur-md border-b border-[#E2DCD0]">
@@ -83,6 +87,19 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <BarChart3 className="w-3.5 h-3.5" />
               <span>INSIGHTS</span>
+            </button>
+
+            <button
+              onClick={onOpenSync}
+              title={isSyncing ? "Cross-device sync is on" : "Set up cross-device sync"}
+              className={`flex items-center gap-1.5 py-1.5 px-2.5 uppercase tracking-wider transition-all rounded-md border ${
+                isSyncing
+                  ? "text-[#2D4A3E] bg-[#8FA89B]/20 border-[#8FA89B]/50"
+                  : "text-[#6B655B] border-transparent hover:text-[#2B2B2B] hover:bg-[#E2DCD0]/30"
+              }`}
+            >
+              {isSyncing ? <Cloud className="w-3.5 h-3.5" /> : <CloudOff className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{isSyncing ? "SYNCED" : "SYNC"}</span>
             </button>
           </nav>
         </div>
