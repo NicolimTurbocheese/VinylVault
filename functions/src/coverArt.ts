@@ -50,7 +50,7 @@ export const coverArt = onRequest(
               const img = r.cover_image || r.thumb;
               if (img && !img.includes("spacer.gif") && !results.includes(img)) {
                 const rTitle = (r.title || "").toLowerCase();
-                if (catalogueNumber || rTitle.includes(mainKeyword)) {
+                if (rTitle.includes(mainKeyword)) {
                   results.push(img);
                 }
               }
