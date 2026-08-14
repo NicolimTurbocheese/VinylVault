@@ -12,9 +12,15 @@ interface TextScanModalProps {
 const STABILITY_CHECK_MS = 220;
 // Minimum time between actual OCR attempts, even while continuously stable.
 const OCR_COOLDOWN_MS = 700;
-// Consecutive stable checks required before triggering OCR (≈ STABILITY_STREAK * STABILITY_CHECK_MS
-// of stillness).
-const STABILITY_STREAK_REQUIRED = 2;
+// Consecutive stable checks required before triggering OCR early (≈ STABILITY_STREAK *
+// STABILITY_CHECK_MS of stillness). Loose on purpose — ordinary camera sensor noise/autofocus
+// jitter shows up as a real pixel difference even when the camera isn't moving, so requiring
+// near-zero diff meant "stillness" was rarely ever detected at all.
+const STABILITY_STREAK_REQUIRED = 1;
+const STABILITY_DIFF_THRESHOLD = 18;
+// Hard fallback: run OCR at least this often regardless of motion, so a noisy/low-light camera
+// that never reads as "stable" still gets attempts instead of going silent.
+const MAX_OCR_GAP_MS = 1800;
 
 // Runs OCR entirely in the browser (Tesseract.js, WebAssembly) — no server call, no API cost,
 // no Gemini quota involved. Continuously reads whatever text the camera is pointed at (like a
@@ -143,7 +149,7 @@ export const TextScanModal: React.FC<TextScanModalProps> = ({ isOpen, onClose, o
         diff += Math.abs(frame[i] - prev[i]);
       }
       const avgDiff = diff / (frame.length / 4);
-      if (avgDiff < 6) {
+      if (avgDiff < STABILITY_DIFF_THRESHOLD) {
         stableStreakRef.current += 1;
       } else {
         stableStreakRef.current = 0;
@@ -152,10 +158,13 @@ export const TextScanModal: React.FC<TextScanModalProps> = ({ isOpen, onClose, o
     prevFrameDataRef.current = frame;
 
     const now = Date.now();
-    if (
-      stableStreakRef.current >= STABILITY_STREAK_REQUIRED &&
-      now - lastOcrAtRef.current >= OCR_COOLDOWN_MS
-    ) {
+    const isStableEnough = stableStreakRef.current >= STABILITY_STREAK_REQUIRED;
+    const cooldownElapsed = now - lastOcrAtRef.current >= OCR_COOLDOWN_MS;
+    // Force an attempt periodically even without a confirmed "stable" read — protects against
+    // noisy/low-light cameras where the diff never reads as still enough on its own.
+    const fallbackDue = now - lastOcrAtRef.current >= MAX_OCR_GAP_MS;
+
+    if ((isStableEnough && cooldownElapsed) || fallbackDue) {
       lastOcrAtRef.current = now;
       runScanPass();
     }
