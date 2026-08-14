@@ -148,13 +148,14 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
         <img
           src={currentUrl}
           alt={alt || `${albumTitle} by ${artist}`}
-          className={imgClassName}
+          className={`${imgClassName} pointer-events-none select-none`}
+          draggable={false}
           onError={() => {
             setHasError(true);
           }}
         />
       ) : (
-        <div className="w-full h-full rounded bg-[#EFEAE0] border border-[#D8D0C0] flex flex-col items-center justify-center p-1 text-center font-sans">
+        <div className="w-full h-full rounded bg-[#EFEAE0] border border-[#D8D0C0] flex flex-col items-center justify-center p-1 text-center font-sans pointer-events-none select-none">
           <ImageOff className="w-5 h-5 text-[#A94A42] mb-1" />
           <span className="text-[9px] text-[#6B655B] font-medium leading-tight">Image error</span>
         </div>
