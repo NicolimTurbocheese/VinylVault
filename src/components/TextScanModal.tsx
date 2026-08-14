@@ -83,9 +83,20 @@ export const TextScanModal: React.FC<TextScanModalProps> = ({ isOpen, onClose, o
     setIsScanning(true);
     try {
       const { data } = await workerRef.current.recognize(dataUrl);
-      const cleaned = (data.text || "").replace(/\s+/g, " ").trim();
-      // Keep the last good read on screen instead of flickering blank on an unreadable frame.
-      if (cleaned && !isEditingRef.current) {
+
+      // Only keep words Tesseract is actually confident about, and that look like real
+      // tokens (at least one letter or digit) rather than stray punctuation/noise — this
+      // is what stops "jumbled up" garbage from ever making it onto the screen.
+      const words: any[] = (data as any).words || [];
+      const goodWords = words.filter(
+        (w) => w.confidence >= 60 && /[A-Za-z0-9]/.test(w.text)
+      );
+      const cleaned = goodWords.map((w) => w.text).join(" ").trim();
+
+      // Require a reasonably solid read (not just one stray confident letter) before
+      // replacing whatever's already on screen — keeps the last good result visible
+      // instead of flickering to a fragment on a weak frame.
+      if (cleaned && cleaned.length >= 3 && !isEditingRef.current) {
         setRecognizedText(cleaned);
       }
     } catch (err) {
@@ -122,6 +133,12 @@ export const TextScanModal: React.FC<TextScanModalProps> = ({ isOpen, onClose, o
     (async () => {
       const { createWorker } = await import("tesseract.js");
       const worker = await createWorker("eng");
+      // Catalogue/matrix/barcode text is only ever letters, digits, and a handful of
+      // punctuation marks — restricting the character set stops Tesseract from guessing
+      // random symbols out of label artwork, scratches, or background noise.
+      await worker.setParameters({
+        tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 -/.&,",
+      });
       if (cancelled) {
         await worker.terminate();
         return;

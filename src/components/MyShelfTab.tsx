@@ -17,13 +17,16 @@ import {
   Calendar,
   Layers,
   ArrowLeft,
-  Package
+  Package,
+  Grid3x3,
+  Disc3
 } from "lucide-react";
 import { ShelfItem, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { exportToCSV, exportToJSON } from "../utils/valuation";
 import { cleanFormatSpec } from "../utils/format";
 import { normalizeDiscogsGenre, DISCOGS_MACRO_GENRES } from "../utils/genre";
 import { RecordCoverImage } from "./RecordCoverImage";
+import { CoverflowCarousel } from "./CoverflowCarousel";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import { useCountUp } from "../hooks/useCountUp";
 
@@ -47,6 +50,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [sortBy, setSortBy] = useState<"value-desc" | "value-asc" | "title" | "year" | "added">("value-desc");
+  const [viewMode, setViewMode] = useState<"grid" | "coverflow">("grid");
   const [itemToDelete, setItemToDelete] = useState<ShelfItem | null>(null);
 
   useEscapeToClose(!!itemToDelete, () => setItemToDelete(null));
@@ -275,6 +279,30 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
 
         {/* Sort selector & Export Buttons */}
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end font-sans">
+          {/* Grid / Coverflow View Toggle */}
+          <div className="flex items-center rounded-md border border-[#D8D0C0] overflow-hidden">
+            <button
+              onClick={() => setViewMode("grid")}
+              title="Grid view"
+              className={`px-2.5 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition ${
+                viewMode === "grid" ? "bg-[#A94A42] text-white" : "bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40"
+              }`}
+            >
+              <Grid3x3 className="w-3.5 h-3.5" />
+              <span>Grid</span>
+            </button>
+            <button
+              onClick={() => setViewMode("coverflow")}
+              title="Coverflow view"
+              className={`px-2.5 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition ${
+                viewMode === "coverflow" ? "bg-[#A94A42] text-white" : "bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40"
+              }`}
+            >
+              <Disc3 className="w-3.5 h-3.5" />
+              <span>Coverflow</span>
+            </button>
+          </div>
+
           <div className="flex items-center gap-1.5 text-xs text-[#6B655B]">
             <ArrowUpDown className="w-3.5 h-3.5 text-[#A94A42]" />
             <span className="uppercase text-[10px] tracking-wider font-bold">Sort:</span>
@@ -407,8 +435,16 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
         </div>
       )}
 
+      {/* Coverflow Browser */}
+      {viewMode === "coverflow" && sortedItems.length > 0 && (
+        <div className="p-4 sm:p-6 rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] shadow-sm">
+          <CoverflowCarousel items={sortedItems} onSelectItem={onEditItem} />
+        </div>
+      )}
+
       {/* Collection Grid View */}
       {sortedItems.length > 0 ? (
+        viewMode === "grid" && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sortedItems.map((item) => (
             <div
@@ -573,6 +609,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             </div>
           ))}
         </div>
+        )
       ) : (
         /* Empty State */
         <div className="p-12 text-center rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] max-w-lg mx-auto space-y-4 shadow-sm">
