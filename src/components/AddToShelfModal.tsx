@@ -4,6 +4,7 @@ import { RecordScanResult, GoldmineGrade, GOLDMINE_GRADES, ShelfItem, ObiConditi
 import { calculateAdjustedValuation, calculateCompleteValuation } from "../utils/valuation";
 import { cleanFormatSpec } from "../utils/format";
 import { normalizeDiscogsGenre, DISCOGS_MACRO_GENRES } from "../utils/genre";
+import { ACQUISITION_COUNTRIES, ACQUISITION_TRANSACTION_TYPES } from "../utils/acquisitionOptions";
 import { RecordCoverImage } from "./RecordCoverImage";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 
@@ -35,8 +36,8 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
     photosPostcards: false,
   });
   const [purchasePrice, setPurchasePrice] = useState<string>("");
-  const [storeLocation, setStoreLocation] = useState<string>("");
-  const [physicalShelfLocation, setPhysicalShelfLocation] = useState<string>("");
+  const [acquisitionCountry, setAcquisitionCountry] = useState<string>("");
+  const [acquisitionTransactionType, setAcquisitionTransactionType] = useState<string>("");
   const [customNotes, setCustomNotes] = useState<string>("");
   const [customValuationAdj, setCustomValuationAdj] = useState<string>("0");
   const [coverArtUrl, setCoverArtUrl] = useState<string>("");
@@ -63,8 +64,8 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
         photosPostcards: false,
       });
       setPurchasePrice(existingItem.purchasePrice ? String(existingItem.purchasePrice) : "");
-      setStoreLocation(existingItem.storeLocation || "");
-      setPhysicalShelfLocation(existingItem.physicalShelfLocation || "");
+      setAcquisitionCountry(existingItem.acquisitionCountry || "");
+      setAcquisitionTransactionType(existingItem.acquisitionTransactionType || "");
       setCustomNotes(existingItem.customNotes || existingItem.freeTextNotes || "");
       setCustomValuationAdj("0");
     } else if (record) {
@@ -88,9 +89,10 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
       });
       const initPrice = (record as any).initialPurchasePrice ?? (record as any).purchasePrice;
       setPurchasePrice(initPrice !== undefined && initPrice !== null && initPrice !== "" ? String(initPrice) : "");
-      const initStore = (record as any).initialStoreLocation ?? (record as any).storeLocation;
-      setStoreLocation(initStore || "");
-      setPhysicalShelfLocation("");
+      const initCountry = (record as any).initialAcquisitionCountry ?? (record as any).acquisitionCountry;
+      const initTransactionType = (record as any).initialAcquisitionTransactionType ?? (record as any).acquisitionTransactionType;
+      setAcquisitionCountry(initCountry || "");
+      setAcquisitionTransactionType(initTransactionType || "");
 
       const cNotes = (record as any).collectorNotes || record.marketNotes;
       const fNotes = (record as any).freeTextNotes;
@@ -168,8 +170,8 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
       freeTextNotes: customNotes.trim() || undefined,
       calculatedValue: finalCalculatedValuation,
       purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
-      storeLocation: storeLocation.trim() || undefined,
-      physicalShelfLocation: physicalShelfLocation.trim() || undefined,
+      acquisitionCountry: acquisitionCountry || undefined,
+      acquisitionTransactionType: acquisitionTransactionType || undefined,
       customNotes: customNotes.trim() || undefined,
       addedAt: existingItem ? existingItem.addedAt : new Date().toISOString(),
     };
@@ -426,34 +428,40 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
             );
           })()}
 
-          {/* Location & Source Inputs */}
+          {/* Acquisition Source Inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center gap-1">
                 <MapPin className="w-3.5 h-3.5 text-[#A94A42]" />
-                Acquisition Source
+                Acquisition Country
               </label>
-              <input
-                type="text"
-                placeholder="e.g. Red Point Record Warehouse, Discogs..."
-                value={storeLocation}
-                onChange={(e) => setStoreLocation(e.target.value)}
-                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] placeholder-[#8C857B] font-sans rounded-md px-3 py-2 text-xs focus:outline-none focus:border-[#A94A42] transition"
-              />
+              <select
+                value={acquisitionCountry}
+                onChange={(e) => setAcquisitionCountry(e.target.value)}
+                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] font-sans rounded-md px-3 py-2 text-xs focus:outline-none focus:border-[#A94A42] transition"
+              >
+                <option value="">Select</option>
+                {ACQUISITION_COUNTRIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
 
             <div>
               <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center gap-1">
                 <MapPin className="w-3.5 h-3.5 text-[#A94A42]" />
-                Physical Shelf Location
+                Acquisition Transaction
               </label>
-              <input
-                type="text"
-                placeholder="e.g. Main Shelf 3, Bin B"
-                value={physicalShelfLocation}
-                onChange={(e) => setPhysicalShelfLocation(e.target.value)}
-                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] placeholder-[#8C857B] font-sans rounded-md px-3 py-2 text-xs focus:outline-none focus:border-[#A94A42] transition"
-              />
+              <select
+                value={acquisitionTransactionType}
+                onChange={(e) => setAcquisitionTransactionType(e.target.value)}
+                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] font-sans rounded-md px-3 py-2 text-xs focus:outline-none focus:border-[#A94A42] transition"
+              >
+                <option value="">Select</option>
+                {ACQUISITION_TRANSACTION_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
           </div>
 

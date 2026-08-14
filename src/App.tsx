@@ -62,8 +62,8 @@ const INITIAL_SEED_SHELF: ShelfItem[] = [
     sleeveGrade: "VG+",
     calculatedValue: { low: 135, median: 195, high: 315 },
     purchasePrice: 45,
-    storeLocation: "Rough Trade, London",
-    physicalShelfLocation: "Bin 1, Front Row",
+    acquisitionCountry: "United Kingdom",
+    acquisitionTransactionType: "Record Store",
     customNotes: "UK 1st pressing with solid blue triangle label & original blue posters.",
     isAmbiguous: false,
     groundingSources: [
@@ -94,8 +94,8 @@ const INITIAL_SEED_SHELF: ShelfItem[] = [
     sleeveGrade: "VG+",
     calculatedValue: { low: 90, median: 146, high: 232 },
     purchasePrice: 35,
-    storeLocation: "Grimey's, Nashville",
-    physicalShelfLocation: "Main Rack A",
+    acquisitionCountry: "USA",
+    acquisitionTransactionType: "Record Store",
     customNotes: "First UK pressing with aligned apple on rear jacket.",
     isAmbiguous: false,
     groundingSources: [

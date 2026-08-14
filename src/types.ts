@@ -169,8 +169,8 @@ export interface ShelfItem extends RecordScanResult {
   valuationBreakdown?: DetailedValuationBreakdown;
   calculatedValue: RecordValueRange;
   purchasePrice?: number;
-  storeLocation?: string;
-  physicalShelfLocation?: string;
+  acquisitionCountry?: string;
+  acquisitionTransactionType?: string;
   customNotes?: string;
   addedAt: string;
   // Which physical storage Box this record is filed in (Organise tab). Missing/unknown

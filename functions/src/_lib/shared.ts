@@ -489,9 +489,14 @@ export function calculateSmartDynamicValuation(data: {
 
   if (extractedPrices.length > 0) {
     extractedPrices.sort((a, b) => a - b);
-    const median = Math.round(extractedPrices[Math.floor(extractedPrices.length / 2)]);
-    const low = Math.max(20, Math.round(median * 0.65));
-    const high = Math.round(median * 1.55);
+    // Final Estimated Market Value = 10% trimmed mean of verified completed-sale prices
+    // (drop the lowest and highest 10%, average what's left) rather than a single midpoint.
+    const n = extractedPrices.length;
+    const trimCount = Math.floor(n * 0.1);
+    const trimmed = n - trimCount * 2 > 0 ? extractedPrices.slice(trimCount, n - trimCount) : extractedPrices;
+    const median = Math.round(trimmed.reduce((sum, v) => sum + v, 0) / trimmed.length);
+    const low = Math.round(extractedPrices[0]);
+    const high = Math.round(extractedPrices[n - 1]);
     return { low, median, high };
   }
 
