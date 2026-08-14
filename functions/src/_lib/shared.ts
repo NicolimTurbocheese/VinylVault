@@ -516,7 +516,7 @@ export function calculateSmartDynamicValuation(data: {
   // just "it's a record." This intentionally starts low and lets the bonuses below do the
   // work of pushing genuinely special pressings up, rather than starting high and treating
   // every record as inherently valuable.
-  let baseMed = 32;
+  let baseMed = 42;
 
   if (!isNaN(year) && year > 1940) {
     if (year < 1970) {
@@ -538,7 +538,7 @@ export function calculateSmartDynamicValuation(data: {
 
   if (format.includes("box set")) {
     baseMed += 55;
-  } else if (format.includes("limited") || format.includes("numbered") || format.includes("audiophile") || format.includes("half-speed") || format.includes("mfsl")) {
+  } else if (format.includes("limited") || format.includes("numbered") || format.includes("audiophile") || format.includes("half-speed") || format.includes("mfsl") || format.includes("180g") || format.includes("180 gram") || format.includes("200g") || format.includes("200 gram")) {
     baseMed += 35;
   } else if (format.includes("gatefold") || format.includes("colored") || format.includes("picture disc")) {
     baseMed += 10;
@@ -566,8 +566,8 @@ export function calculateSmartDynamicValuation(data: {
   const variance = (seed % 21) - 10;
   baseMed = Math.max(15, Math.round(baseMed + variance));
 
-  const low = Math.max(10, Math.round(baseMed * 0.60));
-  const high = Math.round(baseMed * 1.45);
+  const low = Math.max(12, Math.round(baseMed * 0.62));
+  const high = Math.round(baseMed * 1.55);
 
   return { low, median: baseMed, high };
 }
