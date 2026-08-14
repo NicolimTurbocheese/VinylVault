@@ -30,6 +30,13 @@ export const coverArt = onRequest(
       const isVarious = !artist || /various|v\/a|soundtrack|ost/i.test(artist);
       const cleanArtist = isVarious ? "" : artist.replace(/\s*\([^)]*\)/g, "").trim();
 
+      // Discogs formats "The Beatles" as "Beatles, The" inside a "Beatles, The - Abbey Road"
+      // release title — strip both forms of "the" wherever they appear so that convention
+      // doesn't produce a false non-match for "The <Band>" style artist names.
+      const normalizeArtistName = (s: string) =>
+        s.toLowerCase().replace(/,\s*the\b/gi, "").replace(/\bthe\s+/gi, "").trim();
+      const normalizedArtist = cleanArtist ? normalizeArtistName(cleanArtist) : "";
+
       // 1. Query Discogs API by Catalogue Number or Clean Title
       try {
         let discogsQuery = "";
@@ -50,7 +57,9 @@ export const coverArt = onRequest(
               const img = r.cover_image || r.thumb;
               if (img && !img.includes("spacer.gif") && !results.includes(img)) {
                 const rTitle = (r.title || "").toLowerCase();
-                if (rTitle.includes(mainKeyword)) {
+                const matchesTitle = rTitle.includes(mainKeyword);
+                const matchesArtist = normalizedArtist ? normalizeArtistName(rTitle).includes(normalizedArtist) : true;
+                if (matchesTitle && matchesArtist) {
                   results.push(img);
                 }
               }
@@ -103,11 +112,18 @@ export const coverArt = onRequest(
           if (mbRes.ok) {
             const mbJson: any = await mbRes.json();
             if (mbJson.releases && mbJson.releases.length > 0) {
-              for (const rel of mbJson.releases.slice(0, 3)) {
+              for (const rel of mbJson.releases) {
+                const relTitle = (rel.title || "").toLowerCase();
+                const relArtist = (rel["artist-credit"]?.[0]?.name || "").toLowerCase();
+                const matchesTitle = relTitle.includes(mainKeyword) || mainKeyword.includes(relTitle);
+                const matchesArtist = normalizedArtist ? normalizeArtistName(relArtist).includes(normalizedArtist) : true;
+                if (!matchesTitle || !matchesArtist) continue;
+
                 const caaUrl = `https://coverartarchive.org/release/${rel.id}/front-500`;
                 if (!results.includes(caaUrl)) {
                   results.push(caaUrl);
                 }
+                if (results.length >= 2) break;
               }
             }
           }
