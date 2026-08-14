@@ -55,6 +55,10 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
 
   useEscapeToClose(!!itemToDelete, () => setItemToDelete(null));
 
+  const recentlyAdded = [...shelfItems]
+    .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
+    .slice(0, 10);
+
   const toggleGenre = (genre: string) => {
     setSelectedGenres((prev) =>
       prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre]
@@ -245,6 +249,34 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
           )}
         </div>
       </div>
+
+      {/* Recently Added Ticker */}
+      {shelfItems.length > 3 && (
+        <div className="rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] shadow-sm overflow-hidden py-3">
+          <span className="block px-4 pb-2 text-[10px] font-sans font-bold uppercase tracking-wider text-[#6B655B]">
+            Recently Added
+          </span>
+          <div className="overflow-hidden">
+            <div className="marquee-track flex items-center gap-3 w-max">
+              {[...recentlyAdded, ...recentlyAdded].map((item, i) => (
+                <button
+                  key={`${item.id}-${i}`}
+                  type="button"
+                  onClick={() => onEditItem(item)}
+                  title={`${item.albumTitle} — ${item.artist}`}
+                  className="shrink-0 w-14 h-14 rounded-md overflow-hidden border border-[#E2DCD0] hover:border-[#A94A42]/50 shadow-xs transition cursor-pointer"
+                >
+                  <img
+                    src={item.coverArtUrl || "https://images.unsplash.com/photo-1619983081563-430f63602796?w=200"}
+                    alt={item.albumTitle}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Control Bar & Export Actions */}
       <div className="p-4 rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] shadow-sm flex flex-col lg:flex-row items-center justify-between gap-4">
@@ -449,7 +481,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
           {sortedItems.map((item) => (
             <div
               key={item.id}
-              className="rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] hover:border-[#A94A42]/40 p-5 shadow-sm hover:shadow-lg transition flex flex-col justify-between group [transform-style:preserve-3d] will-change-transform"
+              className="spotlight-card rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] hover:border-[#A94A42]/40 p-5 shadow-sm hover:shadow-lg transition flex flex-col justify-between group [transform-style:preserve-3d] will-change-transform"
               onMouseMove={(e) => {
                 if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
                 const card = e.currentTarget;
@@ -457,6 +489,8 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                 const px = (e.clientX - rect.left) / rect.width - 0.5;
                 const py = (e.clientY - rect.top) / rect.height - 0.5;
                 card.style.transform = `perspective(900px) rotateX(${(-py * 6).toFixed(2)}deg) rotateY(${(px * 6).toFixed(2)}deg) translateY(-3px)`;
+                card.style.setProperty("--mx", `${((px + 0.5) * 100).toFixed(1)}%`);
+                card.style.setProperty("--my", `${((py + 0.5) * 100).toFixed(1)}%`);
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "";
