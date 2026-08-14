@@ -124,16 +124,21 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
 
   return (
     <div className="space-y-8 pb-12">
-      {/* Metric Cards Grid */}
+      {/* Metric Cards Bento Grid — the portfolio total is the headline number, so it gets
+          double width and a rotating gradient border; the gain/loss card runs full width
+          along the bottom since it's the second most important read at a glance. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-lg bg-[#161616] border border-[#D4AF37]/20 shadow-2xl">
+        <div
+          className="border-beam sm:col-span-2 lg:col-span-2 p-6 rounded-lg bg-[#161616] border border-[#D4AF37]/20 shadow-2xl flex flex-col justify-center"
+          style={{ ["--beam-color" as any]: "rgba(212, 175, 55, 0.9)" }}
+        >
           <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400 block">
             Portfolio Total Value
           </span>
-          <div className="text-2xl font-serif font-bold text-[#FFBF00] mt-1 tabular-nums">
+          <div className="text-4xl font-serif font-bold text-[#FFBF00] mt-1.5 tabular-nums">
             S${animatedTotalMedian.toLocaleString()}
           </div>
-          <span className="text-[10px] font-mono text-zinc-500 block mt-1">
+          <span className="text-[10px] font-mono text-zinc-500 block mt-1.5">
             Est: S${totalLow.toLocaleString()} - S${totalHigh.toLocaleString()}
           </span>
         </div>
@@ -162,17 +167,19 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
           </span>
         </div>
 
-        <div className="p-5 rounded-lg bg-[#161616] border border-[#D4AF37]/20 shadow-2xl">
-          <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400 block flex items-center gap-1">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-            Estimated Value Gain
-          </span>
-          <div className={`text-2xl font-serif font-bold mt-1 tabular-nums ${netGain >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+        <div className="sm:col-span-2 lg:col-span-4 p-5 rounded-lg bg-[#161616] border border-[#D4AF37]/20 shadow-2xl flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-1">
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              Estimated Value Gain
+            </span>
+            <span className="text-[10px] font-mono text-zinc-500 block mt-1">
+              Based on logged prices
+            </span>
+          </div>
+          <div className={`text-3xl font-serif font-bold tabular-nums ${netGain >= 0 ? "text-emerald-400" : "text-red-400"}`}>
             {netGain >= 0 ? `+S$${animatedNetGain.toLocaleString()}` : `-S$${Math.abs(animatedNetGain).toLocaleString()}`}
           </div>
-          <span className="text-[10px] font-mono text-zinc-500 block mt-1">
-            Based on logged prices
-          </span>
         </div>
       </div>
 
