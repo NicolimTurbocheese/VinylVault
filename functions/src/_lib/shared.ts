@@ -450,6 +450,17 @@ export function calculateSmartDynamicValuation(data: {
 }): { low: number; median: number; high: number } {
   const extractedPrices: number[] = [];
 
+  // Currency conversion must be judged per-match, not against the whole source string —
+  // citations are routinely formatted like "S$125.00 (USD $92.00)" per the AI prompt's own
+  // example, and checking the whole string for "USD" would multiply the already-correct SGD
+  // figure by the USD rate too, inflating every such citation by ~35%.
+  const currencyMultiplierFor = (matchText: string): number => {
+    if (/GBP|£/i.test(matchText)) return 1.70;
+    if (/EUR|€/i.test(matchText)) return 1.45;
+    if (/USD/i.test(matchText) || (matchText.includes("$") && !matchText.includes("S$"))) return 1.35;
+    return 1; // S$ prefix, or no currency marker — already SGD
+  };
+
   if (data.ebayCitations && Array.isArray(data.ebayCitations)) {
     for (const cite of data.ebayCitations) {
       if (cite.price) {
@@ -458,16 +469,7 @@ export function calculateSmartDynamicValuation(data: {
           for (const m of matches) {
             const num = parseFloat(m.replace(/[^0-9.]/g, ""));
             if (!isNaN(num) && num > 10 && num < 2500) {
-              let sgdVal = num;
-              const pStr = String(cite.price);
-              if (pStr.includes("GBP") || pStr.includes("£")) {
-                sgdVal = num * 1.70;
-              } else if (pStr.includes("EUR") || pStr.includes("€")) {
-                sgdVal = num * 1.45;
-              } else if (pStr.includes("USD") || (pStr.includes("$") && !pStr.includes("S$"))) {
-                sgdVal = num * 1.35;
-              }
-              extractedPrices.push(sgdVal);
+              extractedPrices.push(num * currencyMultiplierFor(m));
             }
           }
         }
@@ -481,7 +483,7 @@ export function calculateSmartDynamicValuation(data: {
       for (const m of matches) {
         const num = parseFloat(m.replace(/[^0-9.]/g, ""));
         if (!isNaN(num) && num > 12 && num < 2500) {
-          extractedPrices.push(num * 1.35);
+          extractedPrices.push(num * currencyMultiplierFor(m));
         }
       }
     }

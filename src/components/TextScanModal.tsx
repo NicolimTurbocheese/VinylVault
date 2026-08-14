@@ -8,7 +8,13 @@ interface TextScanModalProps {
   onUseText: (text: string, target: "catalogueNumber" | "matrixCode" | "barcode" | "artistAlbum") => void;
 }
 
-const SCAN_INTERVAL_MS = 1200;
+// How often to check whether the camera has gone still (cheap — a tiny downsampled frame diff).
+const STABILITY_CHECK_MS = 220;
+// Minimum time between actual OCR attempts, even while continuously stable.
+const OCR_COOLDOWN_MS = 700;
+// Consecutive stable checks required before triggering OCR (≈ STABILITY_STREAK * STABILITY_CHECK_MS
+// of stillness).
+const STABILITY_STREAK_REQUIRED = 2;
 
 // Runs OCR entirely in the browser (Tesseract.js, WebAssembly) — no server call, no API cost,
 // no Gemini quota involved. Continuously reads whatever text the camera is pointed at (like a
@@ -17,9 +23,13 @@ const SCAN_INTERVAL_MS = 1200;
 export const TextScanModal: React.FC<TextScanModalProps> = ({ isOpen, onClose, onUseText }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const stabilityCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const workerRef = useRef<any>(null);
   const isProcessingRef = useRef(false);
   const isEditingRef = useRef(false);
+  const prevFrameDataRef = useRef<Uint8ClampedArray | null>(null);
+  const stableStreakRef = useRef(0);
+  const lastOcrAtRef = useRef(0);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -107,12 +117,59 @@ export const TextScanModal: React.FC<TextScanModalProps> = ({ isOpen, onClose, o
     }
   }, []);
 
+  // Cheap motion check: downsample the current frame to a tiny canvas and compare it to the
+  // last check. Only once the camera has actually settled (a couple of consecutive stable
+  // checks) do we bother running the expensive OCR pass — this is what makes a brief moment
+  // of stillness enough, instead of needing to hold dead-still for however long a fixed
+  // capture interval happens to land on.
+  const checkStabilityAndMaybeScan = useCallback(() => {
+    if (isProcessingRef.current || isEditingRef.current) return;
+    if (!videoRef.current || !stabilityCanvasRef.current) return;
+    const video = videoRef.current;
+    if (!video.videoWidth) return;
+
+    const diffCanvas = stabilityCanvasRef.current;
+    diffCanvas.width = 48;
+    diffCanvas.height = 36;
+    const ctx = diffCanvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, 48, 36);
+    const frame = ctx.getImageData(0, 0, 48, 36).data;
+
+    const prev = prevFrameDataRef.current;
+    if (prev) {
+      let diff = 0;
+      for (let i = 0; i < frame.length; i += 4) {
+        diff += Math.abs(frame[i] - prev[i]);
+      }
+      const avgDiff = diff / (frame.length / 4);
+      if (avgDiff < 6) {
+        stableStreakRef.current += 1;
+      } else {
+        stableStreakRef.current = 0;
+      }
+    }
+    prevFrameDataRef.current = frame;
+
+    const now = Date.now();
+    if (
+      stableStreakRef.current >= STABILITY_STREAK_REQUIRED &&
+      now - lastOcrAtRef.current >= OCR_COOLDOWN_MS
+    ) {
+      lastOcrAtRef.current = now;
+      runScanPass();
+    }
+  }, [runScanPass]);
+
   // Camera lifecycle
   useEffect(() => {
     if (isOpen) {
       setRecognizedText("");
       isEditingRef.current = false;
       setIsPaused(false);
+      prevFrameDataRef.current = null;
+      stableStreakRef.current = 0;
+      lastOcrAtRef.current = 0;
       startCamera(facingMode);
     } else {
       stopCamera();
@@ -144,7 +201,7 @@ export const TextScanModal: React.FC<TextScanModalProps> = ({ isOpen, onClose, o
         return;
       }
       workerRef.current = worker;
-      intervalId = window.setInterval(runScanPass, SCAN_INTERVAL_MS);
+      intervalId = window.setInterval(checkStabilityAndMaybeScan, STABILITY_CHECK_MS);
     })();
 
     return () => {
@@ -155,7 +212,7 @@ export const TextScanModal: React.FC<TextScanModalProps> = ({ isOpen, onClose, o
         workerRef.current = null;
       }
     };
-  }, [isOpen, runScanPass]);
+  }, [isOpen, checkStabilityAndMaybeScan]);
 
   const handleUse = (target: "catalogueNumber" | "matrixCode" | "barcode" | "artistAlbum") => {
     if (!recognizedText) return;
@@ -300,6 +357,7 @@ export const TextScanModal: React.FC<TextScanModalProps> = ({ isOpen, onClose, o
         </div>
 
         <canvas ref={canvasRef} className="hidden" />
+        <canvas ref={stabilityCanvasRef} className="hidden" />
       </div>
     </div>
   );

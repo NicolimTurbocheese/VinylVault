@@ -251,7 +251,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
       </div>
 
       {/* Recently Added Ticker */}
-      {shelfItems.length > 3 && (
+      {shelfItems.length > 1 && (
         <div className="rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] shadow-sm overflow-hidden py-3">
           <span className="block px-4 pb-2 text-[10px] font-sans font-bold uppercase tracking-wider text-[#6B655B]">
             Recently Added
