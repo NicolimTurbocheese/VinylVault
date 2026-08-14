@@ -83,20 +83,20 @@ export const TextScanModal: React.FC<TextScanModalProps> = ({ isOpen, onClose, o
     setIsScanning(true);
     try {
       const { data } = await workerRef.current.recognize(dataUrl);
+      const overallConfidence = (data as any).confidence ?? 0;
 
-      // Only keep words Tesseract is actually confident about, and that look like real
-      // tokens (at least one letter or digit) rather than stray punctuation/noise — this
-      // is what stops "jumbled up" garbage from ever making it onto the screen.
-      const words: any[] = (data as any).words || [];
-      const goodWords = words.filter(
-        (w) => w.confidence >= 60 && /[A-Za-z0-9]/.test(w.text)
-      );
-      const cleaned = goodWords.map((w) => w.text).join(" ").trim();
+      // The character whitelist keeps the OCR engine itself from guessing random symbols;
+      // this is a second pass of the same idea as a safety net on the raw text, plus an
+      // overall-confidence floor so a blurry/unreadable frame doesn't get shown at all.
+      const cleaned = (data.text || "")
+        .replace(/[^A-Za-z0-9 \-/.&,\n]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
 
-      // Require a reasonably solid read (not just one stray confident letter) before
-      // replacing whatever's already on screen — keeps the last good result visible
-      // instead of flickering to a fragment on a weak frame.
-      if (cleaned && cleaned.length >= 3 && !isEditingRef.current) {
+      // Require a reasonably solid read (not just a stray character) before replacing
+      // whatever's already on screen — keeps the last good result visible instead of
+      // flickering to a fragment on a weak frame.
+      if (cleaned && cleaned.length >= 3 && overallConfidence >= 45 && !isEditingRef.current) {
         setRecognizedText(cleaned);
       }
     } catch (err) {
