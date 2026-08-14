@@ -23,7 +23,8 @@ import {
   Check,
   Archive,
   Barcode,
-  BookmarkPlus
+  BookmarkPlus,
+  ScanText
 } from "lucide-react";
 import { cleanFormatSpec } from "../utils/format";
 import { normalizeDiscogsGenre } from "../utils/genre";
@@ -39,8 +40,10 @@ import {
 import { calculateAdjustedValuation, calculateCompleteValuation } from "../utils/valuation";
 import { CameraModal } from "./CameraModal";
 import { BarcodeScannerModal } from "./BarcodeScannerModal";
+import { TextScanModal } from "./TextScanModal";
 import { RecordCoverImage } from "./RecordCoverImage";
 import { apiUrl } from "../utils/apiBase";
+import { ACQUISITION_COUNTRIES, ACQUISITION_TRANSACTION_TYPES } from "../utils/acquisitionOptions";
 
 interface ScanSearchTabProps {
   onSaveToShelf: (result: RecordScanResult, mediaGrade: GoldmineGrade, sleeveGrade: GoldmineGrade) => void;
@@ -65,6 +68,7 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
   const [scanResult, setScanResult] = useState<RecordScanResult | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
+  const [isTextScanOpen, setIsTextScanOpen] = useState(false);
 
   // Goldmine Grading & Copy Specifics state
   const [mediaGrade, setMediaGrade] = useState<GoldmineGrade>("VG+");
@@ -170,8 +174,9 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
   const [finalUserAdjustment, setFinalUserAdjustment] = useState<number>(0);
   // User Purchase Price Input (S$)
   const [purchasePriceInput, setPurchasePriceInput] = useState<string>("");
-  // Acquisition Source Input
-  const [acquisitionSourceInput, setAcquisitionSourceInput] = useState<string>("");
+  // Acquisition Source Inputs
+  const [acquisitionCountryInput, setAcquisitionCountryInput] = useState<string>("");
+  const [acquisitionTransactionInput, setAcquisitionTransactionInput] = useState<string>("");
   // Verify Exact Pressing Deep Dive Bypass State
   const [matrixPromptBypassed, setMatrixPromptBypassed] = useState<boolean>(false);
 
@@ -200,7 +205,8 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
       sleeveGrade,
       obiCondition,
       initialPurchasePrice: purchasePriceInput ? parseFloat(purchasePriceInput) : undefined,
-      initialStoreLocation: acquisitionSourceInput,
+      initialAcquisitionCountry: acquisitionCountryInput,
+      initialAcquisitionTransactionType: acquisitionTransactionInput,
       initialAutoNotes: combinedAutoNotes,
       freeTextNotes: freeTextNotes.trim() || scanResult.freeTextNotes,
       initialValuationAdj: finalUserAdjustment,
@@ -213,7 +219,8 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
     setError(null);
     setFinalUserAdjustment(0);
     setPurchasePriceInput("");
-    setAcquisitionSourceInput("");
+    setAcquisitionCountryInput("");
+    setAcquisitionTransactionInput("");
     setMatrixPromptBypassed(false);
 
     if (!catalogueNumber && !matrixCode && !barcode && !recordLabel && !artistAlbum && !imageBase64) {
@@ -417,7 +424,8 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
     });
     setFinalUserAdjustment(0);
     setPurchasePriceInput("");
-    setAcquisitionSourceInput("");
+    setAcquisitionCountryInput("");
+    setAcquisitionTransactionInput("");
     setMatrixPromptBypassed(false);
     setError(null);
   };
@@ -573,6 +581,16 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
             </div>
 
             <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end font-sans">
+              <button
+                type="button"
+                onClick={() => setIsTextScanOpen(true)}
+                title="Point the camera at printed text and read it automatically — no typing, no AI cost"
+                className="flex-1 sm:flex-initial px-4 py-2.5 rounded-md text-xs font-bold uppercase tracking-wider bg-[#2D4A3E] text-white hover:bg-[#25392F] transition flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+              >
+                <ScanText className="w-3.5 h-3.5 text-white" />
+                <span>Scan Text</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setIsCameraOpen(true)}
@@ -1185,22 +1203,30 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
                 {/* 1.5) Acquisition Source (Insert after purchase price) */}
                 <div className="p-4 rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] space-y-2.5 font-sans shadow-sm">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div>
-                      <span className="block text-[10px] uppercase tracking-wider text-[#A94A42] font-sans font-bold mb-1">
-                        Acquisition Source
-                      </span>
-                      <span className="text-[10px] text-[#6B655B]">
-                        Where/from whom was this record acquired? (e.g. Red Point Record Warehouse, Discogs)
-                      </span>
-                    </div>
-                    <div className="w-full sm:w-auto">
-                      <input
-                        type="text"
-                        value={acquisitionSourceInput}
-                        onChange={(e) => setAcquisitionSourceInput(e.target.value)}
-                        placeholder="e.g. Store, Dealer, Discogs..."
-                        className="w-full sm:w-64 bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] font-sans rounded-md px-3 py-1.5 text-xs focus:outline-none focus:border-[#A94A42]"
-                      />
+                    <span className="block text-[10px] uppercase tracking-wider text-[#A94A42] font-sans font-bold">
+                      Acquisition Source
+                    </span>
+                    <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+                      <select
+                        value={acquisitionCountryInput}
+                        onChange={(e) => setAcquisitionCountryInput(e.target.value)}
+                        className="w-full sm:w-40 bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] font-sans rounded-md px-3 py-1.5 text-xs focus:outline-none focus:border-[#A94A42]"
+                      >
+                        <option value="">Select</option>
+                        {ACQUISITION_COUNTRIES.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={acquisitionTransactionInput}
+                        onChange={(e) => setAcquisitionTransactionInput(e.target.value)}
+                        className="w-full sm:w-44 bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] font-sans rounded-md px-3 py-1.5 text-xs focus:outline-none focus:border-[#A94A42]"
+                      >
+                        <option value="">Select</option>
+                        {ACQUISITION_TRANSACTION_TYPES.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -1423,6 +1449,18 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
         onDetected={(scannedBarcode) => {
           setBarcode(scannedBarcode);
           setIsBarcodeScannerOpen(false);
+        }}
+      />
+
+      {/* Text Scan (on-device OCR) Modal */}
+      <TextScanModal
+        isOpen={isTextScanOpen}
+        onClose={() => setIsTextScanOpen(false)}
+        onUseText={(text, target) => {
+          if (target === "catalogueNumber") setCatalogueNumber(text);
+          else if (target === "matrixCode") setMatrixCode(text);
+          else if (target === "barcode") setBarcode(text.replace(/\s+/g, ""));
+          else if (target === "artistAlbum") setArtistAlbum(text);
         }}
       />
     </div>

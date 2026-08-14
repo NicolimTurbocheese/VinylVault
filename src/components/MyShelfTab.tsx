@@ -7,7 +7,6 @@ import {
   Trash2,
   Edit,
   DollarSign,
-  MapPin,
   Tag,
   Award,
   Sparkles,
@@ -130,7 +129,8 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
       norm.genre.toLowerCase().includes(query) ||
       norm.styles.some(s => s.toLowerCase().includes(query)) ||
       (item.customNotes || "").toLowerCase().includes(query) ||
-      (item.storeLocation || "").toLowerCase().includes(query)
+      (item.acquisitionCountry || "").toLowerCase().includes(query) ||
+      (item.acquisitionTransactionType || "").toLowerCase().includes(query)
     );
   });
 
@@ -527,17 +527,14 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                     </div>
                   )}
 
-                  {item.physicalShelfLocation && (
-                    <div className="flex items-center gap-1.5 text-[#2B2B2B]">
-                      <MapPin className="w-3.5 h-3.5 text-[#A94A42]" />
-                      <span>Loc: {item.physicalShelfLocation}</span>
-                    </div>
-                  )}
-
                   {item.purchasePrice !== undefined && (
                     <div className="flex items-center gap-1.5 text-[#6B655B]">
                       <span>Cost: S${item.purchasePrice}</span>
-                      {item.storeLocation && <span className="opacity-75">({item.storeLocation})</span>}
+                      {(item.acquisitionTransactionType || item.acquisitionCountry) && (
+                        <span className="opacity-75">
+                          ({[item.acquisitionTransactionType, item.acquisitionCountry].filter(Boolean).join(", ")})
+                        </span>
+                      )}
                     </div>
                   )}
 

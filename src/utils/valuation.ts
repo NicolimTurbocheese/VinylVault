@@ -289,8 +289,8 @@ export function exportToCSV(items: ShelfItem[], filename = "vinylvault-collectio
     "Median Value (S$)",
     "High Value (S$)",
     "Purchase Price (S$)",
-    "Store Location",
-    "Physical Shelf Location",
+    "Acquisition Country",
+    "Acquisition Transaction",
     "Custom Notes",
     "Added Date"
   ];
@@ -311,8 +311,8 @@ export function exportToCSV(items: ShelfItem[], filename = "vinylvault-collectio
     item.calculatedValue?.median ?? 0,
     item.calculatedValue?.high ?? 0,
     item.purchasePrice ?? "",
-    `"${(item.storeLocation || "").replace(/"/g, '""')}"`,
-    `"${(item.physicalShelfLocation || "").replace(/"/g, '""')}"`,
+    `"${(item.acquisitionCountry || "").replace(/"/g, '""')}"`,
+    `"${(item.acquisitionTransactionType || "").replace(/"/g, '""')}"`,
     `"${(item.customNotes || "").replace(/"/g, '""')}"`,
     `"${item.addedAt || ""}"`
   ]);
