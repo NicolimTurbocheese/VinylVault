@@ -283,9 +283,28 @@ export const coverArt = onRequest(
 
               for (const rel of matched) {
 
-                const caaUrl = `https://coverartarchive.org/release/${rel.id}/front-500`;
-                if (!results.includes(caaUrl)) {
-                  results.push(caaUrl);
+                // Most MusicBrainz releases have no cover art uploaded to the Archive at
+                // all — pushing this URL unconditionally used to hand back a broken image
+                // and, worse, block the Wikipedia/TheAudioDB fallbacks below (they only
+                // run when results is still empty). A HEAD check confirms it's real before
+                // it counts as a find.
+                try {
+                  const caaUrl = `https://coverartarchive.org/release/${rel.id}/front-500`;
+                  const caaHead = await fetch(caaUrl, { method: "HEAD" });
+                  if (caaHead.ok && !results.includes(caaUrl)) {
+                    results.push(caaUrl);
+                  } else if (rel["release-group"]?.id) {
+                    // The specific pressing has no art uploaded, but the release-group
+                    // (the album as a whole, across all its editions) very often does —
+                    // a real cover beats no cover even if it's not this exact pressing's photo.
+                    const rgUrl = `https://coverartarchive.org/release-group/${rel["release-group"].id}/front-500`;
+                    const rgHead = await fetch(rgUrl, { method: "HEAD" });
+                    if (rgHead.ok && !results.includes(rgUrl)) {
+                      results.push(rgUrl);
+                    }
+                  }
+                } catch (caaErr) {
+                  console.warn("CoverArtArchive HEAD check error:", caaErr);
                 }
 
                 if (tracklist.length === 0 && rel.id) {
