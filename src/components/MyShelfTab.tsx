@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Library,
   Download,
@@ -21,7 +21,8 @@ import {
   Grid3x3,
   Disc3,
   Upload,
-  RefreshCw
+  RefreshCw,
+  MoreVertical
 } from "lucide-react";
 import { ShelfItem, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { exportToCSV, exportToJSON } from "../utils/valuation";
@@ -63,6 +64,19 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   const [coverFetchProgress, setCoverFetchProgress] = useState<{ done: number; total: number; found: number } | null>(null);
   const [recalcProgress, setRecalcProgress] = useState<{ done: number; total: number; changed: number } | null>(null);
   const [isRecalcConfirmOpen, setIsRecalcConfirmOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isMoreMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isMoreMenuOpen]);
 
   const missingCoverItems = shelfItems.filter((i) => !i.coverArtUrl);
 
@@ -491,8 +505,8 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             </select>
           </div>
 
-          {/* Import + Export Buttons */}
-          <div className="flex items-center gap-2">
+          {/* More Actions Menu — Import/Export/Clear/Fetch Covers/Recalculate */}
+          <div className="relative" ref={moreMenuRef}>
             <input
               ref={importFileInputRef}
               type="file"
@@ -501,75 +515,103 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
               onChange={handleImportFileChange}
             />
             <button
-              onClick={() => importFileInputRef.current?.click()}
+              onClick={() => setIsMoreMenuOpen((prev) => !prev)}
               className="px-3 py-1.5 rounded-md bg-[#EFEAE0] text-[#2B2B2B] border border-[#D8D0C0] hover:bg-[#FAF8F3] text-xs font-sans font-bold uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer"
-              title="Import Collection from JSON"
+              title="More actions"
             >
-              <Upload className="w-3.5 h-3.5 text-[#6B655B]" />
-              <span>Import</span>
-            </button>
-            {shelfItems.length > 0 && (
-              <button
-                onClick={() => {
-                  setClearAllConfirmText("");
-                  setIsClearAllConfirmOpen(true);
-                }}
-                className="px-3 py-1.5 rounded-md bg-[#EFEAE0] text-[#A94A42] border border-[#D8D0C0] hover:bg-red-50 hover:border-red-300 text-xs font-sans font-bold uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer"
-                title="Delete every record on the shelf — useful before re-importing a fresh JSON file so records don't stack"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-[#A94A42]" />
-                <span>Clear All</span>
-              </button>
-            )}
-            {missingCoverItems.length > 0 && (
-              <button
-                onClick={handleBulkFetchCovers}
-                disabled={!!coverFetchProgress}
-                className="px-3 py-1.5 rounded-md bg-[#EFEAE0] text-[#2B2B2B] border border-[#D8D0C0] hover:bg-[#FAF8F3] text-xs font-sans font-bold uppercase tracking-wider flex items-center gap-1.5 transition disabled:opacity-60 cursor-pointer"
-                title="Fetch cover art for every record that's missing it, one after another"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 text-[#6B655B] ${coverFetchProgress ? "animate-spin" : ""}`} />
-                <span>
-                  {coverFetchProgress
-                    ? `Fetching Covers ${coverFetchProgress.done}/${coverFetchProgress.total}`
-                    : `Fetch ${missingCoverItems.length} Missing Cover${missingCoverItems.length === 1 ? "" : "s"}`}
-                </span>
-              </button>
-            )}
-            {shelfItems.length > 0 && (
-              <button
-                onClick={() => setIsRecalcConfirmOpen(true)}
-                disabled={!!recalcProgress}
-                className="px-3 py-1.5 rounded-md bg-[#EFEAE0] text-[#2B2B2B] border border-[#D8D0C0] hover:bg-[#FAF8F3] text-xs font-sans font-bold uppercase tracking-wider flex items-center gap-1.5 transition disabled:opacity-60 cursor-pointer"
-                title="Recalculate every record's Est. Value using the current valuation engine"
-              >
-                <DollarSign className={`w-3.5 h-3.5 text-[#6B655B] ${recalcProgress ? "animate-pulse" : ""}`} />
-                <span>
-                  {recalcProgress
-                    ? `Recalculating ${recalcProgress.done}/${recalcProgress.total}`
-                    : "Recalculate All Values"}
-                </span>
-              </button>
-            )}
-            <button
-              onClick={() => exportToCSV(shelfItems)}
-              disabled={shelfItems.length === 0}
-              className="px-3 py-1.5 rounded-md bg-[#A94A42] text-white hover:bg-[#8E3E37] text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition disabled:opacity-40 shadow-xs cursor-pointer"
-              title="Export Collection to CSV"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-white" />
-              <span>CSV</span>
+              <MoreVertical className="w-3.5 h-3.5 text-[#6B655B]" />
+              <span>Actions</span>
             </button>
 
-            <button
-              onClick={() => exportToJSON(shelfItems)}
-              disabled={shelfItems.length === 0}
-              className="px-3 py-1.5 rounded-md bg-[#EFEAE0] text-[#2B2B2B] border border-[#D8D0C0] hover:bg-[#FAF8F3] text-xs font-sans font-bold uppercase tracking-wider flex items-center gap-1.5 transition disabled:opacity-40 cursor-pointer"
-              title="Export Collection to JSON"
-            >
-              <FileJson className="w-3.5 h-3.5 text-[#6B655B]" />
-              <span>JSON</span>
-            </button>
+            {isMoreMenuOpen && (
+              <div className="absolute right-0 mt-1.5 w-72 rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] shadow-xl z-30 py-1.5 font-sans">
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    importFileInputRef.current?.click();
+                  }}
+                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left"
+                >
+                  <Upload className="w-3.5 h-3.5 text-[#6B655B]" />
+                  <span>Import from JSON</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    exportToCSV(shelfItems);
+                  }}
+                  disabled={shelfItems.length === 0}
+                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-[#6B655B]" />
+                  <span>Export to CSV</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    exportToJSON(shelfItems);
+                  }}
+                  disabled={shelfItems.length === 0}
+                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <FileJson className="w-3.5 h-3.5 text-[#6B655B]" />
+                  <span>Export to JSON</span>
+                </button>
+
+                <div className="my-1.5 border-t border-[#E2DCD0]" />
+
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    handleBulkFetchCovers();
+                  }}
+                  disabled={missingCoverItems.length === 0 || !!coverFetchProgress}
+                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-[#6B655B] ${coverFetchProgress ? "animate-spin" : ""}`} />
+                  <span>
+                    {coverFetchProgress
+                      ? `Fetching Covers ${coverFetchProgress.done}/${coverFetchProgress.total}`
+                      : missingCoverItems.length > 0
+                      ? `Fetch ${missingCoverItems.length} Missing Cover${missingCoverItems.length === 1 ? "" : "s"}`
+                      : "Fetch Missing Covers"}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    setIsRecalcConfirmOpen(true);
+                  }}
+                  disabled={shelfItems.length === 0 || !!recalcProgress}
+                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <DollarSign className={`w-3.5 h-3.5 text-[#6B655B] ${recalcProgress ? "animate-pulse" : ""}`} />
+                  <span>
+                    {recalcProgress
+                      ? `Recalculating ${recalcProgress.done}/${recalcProgress.total}`
+                      : "Recalculate All Values"}
+                  </span>
+                </button>
+
+                <div className="my-1.5 border-t border-[#E2DCD0]" />
+
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    setClearAllConfirmText("");
+                    setIsClearAllConfirmOpen(true);
+                  }}
+                  disabled={shelfItems.length === 0}
+                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#A94A42] hover:bg-red-50 transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-[#A94A42]" />
+                  <span>Clear All Records</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
         {importError && (
