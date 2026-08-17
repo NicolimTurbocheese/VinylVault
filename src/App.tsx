@@ -376,6 +376,57 @@ export default function App() {
     }
   };
 
+  // Applies a batch of partial updates (matched by albumTitle+artist, same normalization
+  // as the duplicate-detection key) to EXISTING shelf records only — unlike handleImportItems,
+  // this never adds a new record, and only overwrites the specific fields present on each
+  // patch object (e.g. just coverArtUrl/tracklist), leaving everything else on the record
+  // untouched. Built for applying research done outside the app (web search results for
+  // records the automated cover-art/tracklist fetch couldn't match) without risking any
+  // other field on a real, personally-owned record.
+  const handleImportPatch = (patches: Array<Partial<ShelfItem> & { albumTitle: string; artist: string }>) => {
+    const normKey = (title: string, artist: string) => `${title}-${artist}`.toLowerCase().trim();
+    let applied = 0;
+    let notFound = 0;
+    let updated = [...shelfItems];
+
+    for (const patch of patches) {
+      if (!patch || !patch.albumTitle || !patch.artist) continue;
+      const key = normKey(patch.albumTitle, patch.artist);
+      const idx = updated.findIndex((i) => normKey(i.albumTitle, i.artist) === key);
+      if (idx === -1) {
+        notFound++;
+        continue;
+      }
+      const { albumTitle, artist, ...fields } = patch;
+      const definedFields = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
+      if (Object.keys(definedFields).length === 0) continue;
+      updated[idx] = { ...updated[idx], ...definedFields };
+      applied++;
+    }
+
+    if (applied === 0) {
+      showToast(
+        notFound > 0
+          ? `Nothing updated — none of the ${notFound} record(s) in that file matched a title+artist on your shelf.`
+          : "Nothing updated — the file had no usable fields.",
+        "error"
+      );
+      return;
+    }
+
+    saveShelfToLocal(updated);
+    showToast(
+      `Updated ${applied} record${applied === 1 ? "" : "s"}${notFound > 0 ? ` (${notFound} not found)` : ""}`
+    );
+
+    if (vaultCode && syncStatus === "connected") {
+      const changed = updated.filter((u, i) => u !== shelfItems[i]);
+      bulkUpsertVaultDocs(vaultCode, "shelfItems", changed.map(sanitizeShelfItem)).catch((err) => {
+        console.error("Failed to sync patched items to vault:", err);
+      });
+    }
+  };
+
   const handleDeleteItem = (id: string) => {
     const item = shelfItems.find((i) => i.id === id);
     const updated = shelfItems.filter((item) => item.id !== id);
@@ -561,6 +612,7 @@ export default function App() {
             onDeleteItem={handleDeleteItem}
             onGoToScan={() => setActiveTab("scan")}
             onImportItems={handleImportItems}
+            onImportPatch={handleImportPatch}
             onQuickUpdateItem={(item) => handleSaveToShelf(item, { showFeedback: false })}
             onClearAllItems={handleClearAllItems}
           />

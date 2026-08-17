@@ -52,6 +52,7 @@ interface MyShelfTabProps {
   onDeleteItem: (id: string) => void;
   onGoToScan: () => void;
   onImportItems: (items: ShelfItem[]) => void;
+  onImportPatch: (patches: Array<Partial<ShelfItem> & { albumTitle: string; artist: string }>) => void;
   onQuickUpdateItem: (item: ShelfItem) => void;
   onClearAllItems: () => void;
 }
@@ -63,6 +64,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   onDeleteItem,
   onGoToScan,
   onImportItems,
+  onImportPatch,
   onQuickUpdateItem,
   onClearAllItems,
 }) => {
@@ -70,6 +72,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   const [clearAllConfirmText, setClearAllConfirmText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const importFileInputRef = React.useRef<HTMLInputElement>(null);
+  const importPatchFileInputRef = React.useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [coverFetchProgress, setCoverFetchProgress] = useState<{ done: number; total: number; found: number } | null>(null);
   const [tracklistFetchProgress, setTracklistFetchProgress] = useState<{ done: number; total: number; found: number } | null>(null);
@@ -292,6 +295,29 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
         onImportItems(arr as ShelfItem[]);
       } catch (err) {
         setImportError(err instanceof Error ? err.message : "Could not read that file as a valid VinylVault JSON export.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImportPatchFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImportError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string);
+        const arr = Array.isArray(parsed) ? parsed : null;
+        if (!arr) throw new Error("File must contain a JSON array of patch records.");
+        const invalidIndex = arr.findIndex((it) => !it || typeof it.albumTitle !== "string" || typeof it.artist !== "string");
+        if (invalidIndex !== -1) {
+          throw new Error(`Record at position ${invalidIndex + 1} is missing an albumTitle/artist.`);
+        }
+        onImportPatch(arr);
+      } catch (err) {
+        setImportError(err instanceof Error ? err.message : "Could not read that file as a valid VinylVault patch file.");
       }
     };
     reader.readAsText(file);
@@ -689,6 +715,13 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
               className="hidden"
               onChange={handleImportFileChange}
             />
+            <input
+              ref={importPatchFileInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={handleImportPatchFileChange}
+            />
             <button
               onClick={() => setIsMoreMenuOpen((prev) => !prev)}
               className="px-3 py-1.5 rounded-md bg-[#EFEAE0] text-[#2B2B2B] border border-[#D8D0C0] hover:bg-[#FAF8F3] text-xs font-sans font-bold uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer"
@@ -709,6 +742,18 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                 >
                   <Upload className="w-3.5 h-3.5 text-[#6B655B]" />
                   <span>Import from JSON</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    importPatchFileInputRef.current?.click();
+                  }}
+                  title="Updates existing records only (matched by title+artist) — never adds new records"
+                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left"
+                >
+                  <Upload className="w-3.5 h-3.5 text-[#6B655B]" />
+                  <span>Update Existing Records (Patch)</span>
                 </button>
 
                 <button
