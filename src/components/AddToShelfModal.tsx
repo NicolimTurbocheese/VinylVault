@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, Save, DollarSign, MapPin, Bookmark, BookmarkPlus, Award, Tag, TrendingUp, TrendingDown, Package, Plus, Calendar, RefreshCw, Settings2, Sparkles } from "lucide-react";
+import { X, Save, DollarSign, MapPin, Bookmark, BookmarkPlus, Award, Tag, TrendingUp, TrendingDown, Package, Plus, Calendar, RefreshCw, Settings2, Sparkles, History } from "lucide-react";
 import { RecordScanResult, GoldmineGrade, GOLDMINE_GRADES, ShelfItem, ObiCondition, PackageInclusions, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { calculateAdjustedValuation, calculateCompleteValuation } from "../utils/valuation";
 import { cleanFormatSpec } from "../utils/format";
@@ -60,6 +60,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
   const [subgenreLibrary, setSubgenreLibrary] = useState<string[]>(() => getStoredSubgenres());
   const [isSubgenreManagerOpen, setIsSubgenreManagerOpen] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [proposedValuation, setProposedValuation] = useState<{
     median: number;
     low: number;
@@ -754,6 +755,38 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
               className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] placeholder-[#8C857B] font-sans rounded-md px-3 py-2 text-xs focus:outline-none focus:border-[#A94A42] transition resize-y leading-relaxed"
             />
           </div>
+
+          {/* Condition / Value History */}
+          {existingItem?.history && existingItem.history.length > 0 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setIsHistoryOpen((prev) => !prev)}
+                className="text-[10px] font-sans uppercase tracking-wider text-[#A94A42] font-bold mb-1 flex items-center gap-1.5 cursor-pointer"
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>History ({existingItem.history.length})</span>
+                <span className="text-[#6B655B] normal-case font-normal">{isHistoryOpen ? "▲" : "▼"}</span>
+              </button>
+              {isHistoryOpen && (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {existingItem.history.map((h, i) => (
+                    <div
+                      key={i}
+                      className="text-[11px] font-sans text-[#6B655B] bg-[#EFEAE0] border border-[#D8D0C0] rounded-md px-2.5 py-1.5 flex items-center justify-between gap-2"
+                    >
+                      <span>{new Date(h.date).toLocaleDateString()} {new Date(h.date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                      <span className="text-[#2B2B2B]">
+                        {gradeLabel(h.mediaGrade)} / {gradeLabel(h.sleeveGrade)}
+                        {h.obiCondition && h.obiCondition !== "N/A" ? ` / OBI ${gradeLabel(h.obiCondition)}` : ""}
+                      </span>
+                      <span className="font-bold text-[#A94A42]">S${h.calculatedValue.median.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Action buttons */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#E2DCD0]">

@@ -10,12 +10,14 @@ import { SyncSettingsModal, SyncStatus } from "./components/SyncSettingsModal";
 import { ToastStack, ToastMessage } from "./components/ToastStack";
 import { CommandPalette } from "./components/CommandPalette";
 import { Confetti } from "./components/Confetti";
-import { RecordScanResult, ShelfItem, VinylBox, UNCATEGORISED_BOX_ID } from "./types";
+import { WantlistTab } from "./components/WantlistTab";
+import { RecordScanResult, ShelfItem, VinylBox, WantlistItem, UNCATEGORISED_BOX_ID } from "./types";
 import { calculateAdjustedValuation } from "./utils/valuation";
 import { cleanFormatSpec } from "./utils/format";
 import { normalizeDiscogsGenre } from "./utils/genre";
 import { isFirebaseConfigured } from "./utils/firebase";
 import { getStoredBoxes, saveBoxesToLocal, generateBoxId } from "./utils/boxes";
+import { getStoredWantlist, saveWantlistToLocal } from "./utils/wantlist";
 import {
   getStoredVaultCode,
   storeVaultCode,
@@ -34,9 +36,10 @@ import type { Unsubscribe } from "firebase/firestore";
 const INITIAL_SEED_SHELF: ShelfItem[] = [];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"scan" | "shelf" | "insights" | "organise">("scan");
+  const [activeTab, setActiveTab] = useState<"scan" | "shelf" | "insights" | "organise" | "wantlist">("scan");
   const [shelfItems, setShelfItems] = useState<ShelfItem[]>([]);
   const [boxes, setBoxes] = useState<VinylBox[]>([]);
+  const [wantlist, setWantlist] = useState<WantlistItem[]>([]);
 
   // Toast feedback
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -95,6 +98,7 @@ export default function App() {
   useEffect(() => {
     loadShelf();
     setBoxes(getStoredBoxes());
+    setWantlist(getStoredWantlist());
     if (vaultCode) {
       connectToVault(vaultCode, { pushLocalOnConnect: false });
     }
@@ -279,10 +283,29 @@ export default function App() {
     const { showFeedback = true } = opts;
     const existingIndex = shelfItems.findIndex((i) => i.id === item.id);
     let updated: ShelfItem[];
+    let itemToStore = item;
 
     if (existingIndex >= 0) {
+      const existing = shelfItems[existingIndex];
+      const gradingOrValueChanged =
+        existing.mediaGrade !== item.mediaGrade ||
+        existing.sleeveGrade !== item.sleeveGrade ||
+        existing.obiCondition !== item.obiCondition ||
+        existing.calculatedValue?.median !== item.calculatedValue?.median;
+
+      if (gradingOrValueChanged) {
+        const entry = {
+          date: new Date().toISOString(),
+          mediaGrade: existing.mediaGrade,
+          sleeveGrade: existing.sleeveGrade,
+          obiCondition: existing.obiCondition,
+          calculatedValue: existing.calculatedValue,
+        };
+        itemToStore = { ...item, history: [entry, ...(existing.history || [])] };
+      }
+
       updated = [...shelfItems];
-      updated[existingIndex] = item;
+      updated[existingIndex] = itemToStore;
     } else {
       updated = [item, ...shelfItems];
     }
@@ -296,7 +319,7 @@ export default function App() {
     }
 
     if (vaultCode && syncStatus === "connected") {
-      upsertVaultDoc(vaultCode, "shelfItems", sanitizeShelfItem(item)).catch((err) => {
+      upsertVaultDoc(vaultCode, "shelfItems", sanitizeShelfItem(itemToStore)).catch((err) => {
         console.error("Failed to sync item to vault:", err);
       });
     }
@@ -378,6 +401,48 @@ export default function App() {
         });
       }
     }
+  };
+
+  const handleAddWantlistItem = (item: WantlistItem) => {
+    const updated = [item, ...wantlist];
+    setWantlist(updated);
+    saveWantlistToLocal(updated);
+    showToast(`Added "${item.albumTitle}" to wantlist`);
+  };
+
+  const handleDeleteWantlistItem = (id: string) => {
+    const updated = wantlist.filter((w) => w.id !== id);
+    setWantlist(updated);
+    saveWantlistToLocal(updated);
+  };
+
+  const handleMoveWantlistToShelf = (item: WantlistItem) => {
+    const shelfItem: ShelfItem = {
+      id: `shelf-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      albumTitle: item.albumTitle,
+      artist: item.artist,
+      releaseYear: "",
+      label: "",
+      country: "",
+      catalogueNumber: "",
+      genre: "Rock",
+      styles: [],
+      coverArtUrl: "",
+      tracklist: [],
+      baseMintValue: { low: 0, median: 0, high: 0 },
+      isAmbiguous: false,
+      groundingSources: [],
+      mediaGrade: "VG+",
+      sleeveGrade: "VG+",
+      calculatedValue: { low: 0, median: 0, high: 0 },
+      purchasePrice: item.targetPriceSGD,
+      customNotes: item.notes,
+      addedAt: new Date().toISOString(),
+    };
+    handleSaveToShelf(shelfItem, { showFeedback: false });
+    handleDeleteWantlistItem(item.id);
+    showToast(`Moved "${item.albumTitle}" to your shelf — fill in the details when you get a chance`);
+    handleOpenModalForEdit(shelfItem);
   };
 
   const handleCreateBox = (name: string) => {
@@ -517,6 +582,15 @@ export default function App() {
             onDeleteBox={handleDeleteBox}
             onMoveItem={handleMoveItemToBox}
             onGoToShelf={() => setActiveTab("shelf")}
+          />
+        </div>
+
+        <div style={{ display: activeTab === "wantlist" ? "block" : "none" }}>
+          <WantlistTab
+            wantlist={wantlist}
+            onAddItem={handleAddWantlistItem}
+            onDeleteItem={handleDeleteWantlistItem}
+            onMoveToShelf={handleMoveWantlistToShelf}
           />
         </div>
       </main>

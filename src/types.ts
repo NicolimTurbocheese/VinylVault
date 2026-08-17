@@ -185,6 +185,19 @@ export interface ShelfItem extends RecordScanResult {
   // check the physical record and confirm or correct it.
   needsReview?: boolean;
   reviewNotes?: string;
+  // Snapshot log of grading/value changes over time, newest first. Appended to (not
+  // overwritten) whenever a save actually changes mediaGrade, sleeveGrade, obiCondition,
+  // or calculatedValue.median — a running history rather than only the current state.
+  history?: ValueHistoryEntry[];
+}
+
+export interface ValueHistoryEntry {
+  date: string; // ISO timestamp
+  mediaGrade: GoldmineGrade;
+  sleeveGrade: GoldmineGrade;
+  obiCondition?: ObiCondition;
+  calculatedValue: RecordValueRange;
+  note?: string;
 }
 
 // A user-defined physical storage location (e.g. "Crate 2", "Living Room Shelf A").
@@ -195,6 +208,19 @@ export interface VinylBox {
 }
 
 export const UNCATEGORISED_BOX_ID = "uncategorised";
+
+export type WantlistPriority = "low" | "medium" | "high";
+
+// A record the user is looking to acquire — separate from the owned shelf.
+export interface WantlistItem {
+  id: string;
+  artist: string;
+  albumTitle: string;
+  notes?: string;
+  targetPriceSGD?: number;
+  priority: WantlistPriority;
+  addedAt: string;
+}
 
 export interface SearchQueryParams {
   catalogueNumber?: string;

@@ -22,13 +22,17 @@ import {
   Disc3,
   Upload,
   RefreshCw,
-  MoreVertical
+  MoreVertical,
+  FileText,
+  X
 } from "lucide-react";
 import { ShelfItem, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { exportToCSV, exportToJSON } from "../utils/valuation";
+import { exportValuationReportPdf } from "../utils/pdfReport";
 import { cleanFormatSpec } from "../utils/format";
 import { normalizeDiscogsGenre, DISCOGS_MACRO_GENRES } from "../utils/genre";
 import { apiUrl } from "../utils/apiBase";
+import { findDuplicateGroups, DuplicateGroup } from "../utils/duplicateCheck";
 import { RecordCoverImage } from "./RecordCoverImage";
 import { CoverflowCarousel } from "./CoverflowCarousel";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
@@ -79,6 +83,19 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   }, [isMoreMenuOpen]);
 
   const missingCoverItems = shelfItems.filter((i) => !i.coverArtUrl);
+  const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[] | null>(null);
+
+  const handleFlagDuplicateGroup = (group: DuplicateGroup) => {
+    const note = `Possible duplicate: ${group.items.length} records share the exact same artist + album title. Could be two different pressings you legitimately own, or a duplicate entry — please confirm.`;
+    for (const item of group.items) {
+      onQuickUpdateItem({
+        ...item,
+        needsReview: true,
+        reviewNotes: item.reviewNotes ? `${item.reviewNotes} | ${note}` : note,
+      });
+    }
+    setDuplicateGroups((prev) => (prev ? prev.filter((g) => g.key !== group.key) : prev));
+  };
 
   const handleBulkRecalculate = async () => {
     const targets = shelfItems;
@@ -184,8 +201,14 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   const [viewMode, setViewMode] = useState<"grid" | "coverflow">("grid");
   const [itemToDelete, setItemToDelete] = useState<ShelfItem | null>(null);
 
-  useEscapeToClose(!!itemToDelete, () => setItemToDelete(null));
-  useBodyScrollLock(!!itemToDelete);
+  const anyModalOpen = !!itemToDelete || isClearAllConfirmOpen || isRecalcConfirmOpen || !!duplicateGroups;
+  useEscapeToClose(anyModalOpen, () => {
+    setItemToDelete(null);
+    setIsClearAllConfirmOpen(false);
+    setIsRecalcConfirmOpen(false);
+    setDuplicateGroups(null);
+  });
+  useBodyScrollLock(anyModalOpen);
 
   const recentlyAdded = [...shelfItems]
     .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
@@ -560,6 +583,18 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                   <span>Export to JSON</span>
                 </button>
 
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    exportValuationReportPdf(shelfItems);
+                  }}
+                  disabled={shelfItems.length === 0}
+                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <FileText className="w-3.5 h-3.5 text-[#6B655B]" />
+                  <span>Valuation Report (PDF)</span>
+                </button>
+
                 <div className="my-1.5 border-t border-[#E2DCD0]" />
 
                 <button
@@ -594,6 +629,18 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                       ? `Recalculating ${recalcProgress.done}/${recalcProgress.total}`
                       : "Recalculate All Values"}
                   </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    setDuplicateGroups(findDuplicateGroups(shelfItems));
+                  }}
+                  disabled={shelfItems.length === 0}
+                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Layers className="w-3.5 h-3.5 text-[#6B655B]" />
+                  <span>Check for Duplicates</span>
                 </button>
 
                 <div className="my-1.5 border-t border-[#E2DCD0]" />
@@ -933,6 +980,70 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
               <span>Scan First Vinyl Record</span>
             </button>
           )}
+        </div>
+      )}
+
+      {/* Duplicate Check Results Modal */}
+      {duplicateGroups && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+          onClick={() => setDuplicateGroups(null)}
+        >
+          <div
+            className="bg-[#FAF8F3] border border-[#E2DCD0] rounded-xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto space-y-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 text-[#A94A42]">
+                <div className="p-2.5 rounded-full bg-[#A94A42]/10 border border-[#A94A42]/20">
+                  <Layers className="w-5 h-5 text-[#A94A42]" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-serif font-bold text-[#2B2B2B]">Duplicate Check</h3>
+                  <p className="text-[11px] font-sans text-[#6B655B]">
+                    {duplicateGroups.length === 0 ? "No matches found" : `${duplicateGroups.length} possible group${duplicateGroups.length === 1 ? "" : "s"} found`}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDuplicateGroups(null)}
+                className="p-1.5 rounded-md text-[#6B655B] hover:text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {duplicateGroups.length === 0 ? (
+              <p className="text-xs font-sans text-[#6B655B] bg-[#EFEAE0] border border-[#D8D0C0] rounded-md p-3">
+                No two records share the exact same artist and album title. This doesn't rule out near-duplicates with
+                slightly different titles — just exact-title matches.
+              </p>
+            ) : (
+              <div className="space-y-3 font-sans">
+                {duplicateGroups.map((group) => (
+                  <div key={group.key} className="p-3 rounded-lg bg-[#EFEAE0] border border-[#D8D0C0] space-y-2">
+                    <div>
+                      <h4 className="text-sm font-serif font-bold text-[#2B2B2B]">{group.albumTitle}</h4>
+                      <p className="text-xs text-[#A94A42] font-medium">{group.artist}</p>
+                    </div>
+                    <div className="space-y-1">
+                      {group.items.map((it) => (
+                        <div key={it.id} className="text-[11px] text-[#6B655B]">
+                          Cat#: {it.catalogueNumber || "(none)"} · {it.releaseYear || "?"} · {it.label || "?"} · S${it.calculatedValue?.median?.toFixed(0) ?? "0"}
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => handleFlagDuplicateGroup(group)}
+                      className="text-[10px] font-bold uppercase tracking-wider text-[#A94A42] hover:underline cursor-pointer"
+                    >
+                      Flag for Review
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

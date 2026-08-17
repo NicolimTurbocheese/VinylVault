@@ -1,9 +1,9 @@
 import React from "react";
-import { Search, Library, BarChart3, Disc3, Cloud, CloudOff, Package, Palette } from "lucide-react";
+import { Search, Library, BarChart3, Disc3, Cloud, CloudOff, Package, Palette, Heart } from "lucide-react";
 
 interface HeaderProps {
-  activeTab: "scan" | "shelf" | "insights" | "organise";
-  setActiveTab: (tab: "scan" | "shelf" | "insights" | "organise") => void;
+  activeTab: "scan" | "shelf" | "insights" | "organise" | "wantlist";
+  setActiveTab: (tab: "scan" | "shelf" | "insights" | "organise" | "wantlist") => void;
   shelfCount: number;
   isSyncing: boolean;
   onOpenSync: () => void;
@@ -110,6 +110,19 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Package className="w-3.5 h-3.5 shrink-0" />
               <span className="hidden lg:inline">ORGANISE</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("wantlist")}
+              title="Wantlist"
+              className={`flex items-center gap-1.5 py-1.5 px-1.5 lg:px-2.5 uppercase tracking-wider transition-all rounded-md ${
+                activeTab === "wantlist"
+                  ? "text-[#A94A42] bg-[#A94A42]/10 border border-[#A94A42]/30 font-bold"
+                  : "text-[#6B655B] border border-transparent hover:text-[#2B2B2B] hover:bg-[#E2DCD0]/30"
+              }`}
+            >
+              <Heart className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden lg:inline">WANTLIST</span>
             </button>
 
             <button
