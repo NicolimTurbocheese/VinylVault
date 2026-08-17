@@ -29,6 +29,7 @@ import {
 } from "recharts";
 import { ShelfItem } from "../types";
 import { useCountUp } from "../hooks/useCountUp";
+import { getStoredSnapshots } from "../utils/valueSnapshots";
 
 interface CollectionInsightsTabProps {
   shelfItems: ShelfItem[];
@@ -121,32 +122,34 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
 
   const COLORS = ["#D4AF37", "#FFBF00", "#997A15", "#B38F24", "#66520E", "#E5C158"];
 
-  // 5. Collection value over time — a running total of estimated value as records were
-  // acquired. Prefer the real purchase date over "Added" date: a bulk import (or any
-  // batch entry) gives many records the same addedAt timestamp, which used to collapse
-  // the whole batch into one vertical jump instead of a real timeline. One point is
-  // plotted per item (not merged by day) — a collection where most records lack a
-  // purchaseDate would otherwise collapse to a single shared date and disappear below
-  // the "more than one point" threshold that gates this chart. This tracks how the
-  // collection's value grew as it was built (acquisition order), not fluctuations in an
-  // already-owned item's market price over time — the app doesn't take periodic
-  // re-valuation snapshots, so a true "market price history" chart isn't something
-  // honest data supports yet.
-  const valueOverTimeData = (() => {
-    const dated = shelfItems
-      .map((item) => ({ item, dateStr: item.purchaseDate || item.addedAt }))
-      .filter((x): x is { item: ShelfItem; dateStr: string } => !!x.dateStr && !isNaN(new Date(x.dateStr).getTime()))
-      .sort((a, b) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime());
+  // 5. Collection value over time. Real monthly snapshots (recorded automatically once per
+  // calendar month by App.tsx) are the preferred source — an actual measured history of the
+  // collection's total value, not a proxy. Until at least two months of snapshots exist,
+  // fall back to a running total by acquisition date (purchaseDate, or addedAt if that's
+  // missing) so the chart isn't just empty for a brand-new collection.
+  const monthlySnapshots = getStoredSnapshots();
+  const usingRealSnapshots = monthlySnapshots.length > 1;
 
-    let running = 0;
-    return dated.map(({ item, dateStr }) => {
-      running += item.calculatedValue?.median || 0;
-      return {
-        date: new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" }),
-        value: running,
-      };
-    });
-  })();
+  const valueOverTimeData = usingRealSnapshots
+    ? monthlySnapshots.map((s) => ({
+        date: new Date(s.date).toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
+        value: s.totalMedian,
+      }))
+    : (() => {
+        const dated = shelfItems
+          .map((item) => ({ item, dateStr: item.purchaseDate || item.addedAt }))
+          .filter((x): x is { item: ShelfItem; dateStr: string } => !!x.dateStr && !isNaN(new Date(x.dateStr).getTime()))
+          .sort((a, b) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime());
+
+        let running = 0;
+        return dated.map(({ item, dateStr }) => {
+          running += item.calculatedValue?.median || 0;
+          return {
+            date: new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" }),
+            value: running,
+          };
+        });
+      })();
 
   // 5. Top 5 Most Valuable
   const topValuable = [...shelfItems]
@@ -285,7 +288,9 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
               <TrendingUp className="w-5 h-5 text-[#D4AF37]" />
               <h3 className="font-serif font-bold text-white text-base">Collection Value Over Time</h3>
             </div>
-            <span className="text-xs font-mono text-zinc-400">By acquisition order</span>
+            <span className="text-xs font-mono text-zinc-400">
+              {usingRealSnapshots ? "Monthly snapshots" : "By acquisition order (building history)"}
+            </span>
           </div>
           <div className="h-64 w-full pt-4">
             <ResponsiveContainer width="100%" height="100%">
