@@ -1,6 +1,43 @@
-import React, { useState, useEffect } from "react";
-import { RefreshCw, ImageOff, Check } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { RefreshCw, ImageOff, Check, Camera } from "lucide-react";
 import { apiUrl } from "../utils/apiBase";
+import { CoverScanModal } from "./CoverScanModal";
+
+// Resizes/compresses a user-picked photo client-side before it's stored as a data URL
+// (Firestore documents cap at 1MB, and this keeps localStorage usage sane too).
+const MAX_DIMENSION = 640;
+const JPEG_QUALITY = 0.75;
+
+function fileToCompressedDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Could not load image"));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+          const scale = MAX_DIMENSION / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Canvas not supported"));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", JPEG_QUALITY));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 interface RecordCoverImageProps {
   src?: string;
@@ -33,6 +70,39 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
   const [candidateUrls, setCandidateUrls] = useState<string[]>([]);
   const [candidateIndex, setCandidateIndex] = useState<number>(0);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+
+  const handleScanCapture = (dataUrl: string) => {
+    setCurrentUrl(dataUrl);
+    setHasError(false);
+    setCandidateUrls([]);
+    setCandidateIndex(0);
+    if (onImageChange) onImageChange(dataUrl);
+  };
+
+  const handlePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setIsLoading(true);
+    setStatusMessage("Processing photo...");
+    try {
+      const dataUrl = await fileToCompressedDataUrl(file);
+      setCurrentUrl(dataUrl);
+      setHasError(false);
+      setCandidateUrls([]);
+      setCandidateIndex(0);
+      setStatusMessage("Photo saved!");
+      if (onImageChange) onImageChange(dataUrl);
+    } catch (err) {
+      console.warn("Error processing uploaded cover photo:", err);
+      setStatusMessage("Couldn't read that photo");
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => setStatusMessage(null), 2000);
+    }
+  };
 
   useEffect(() => {
     if (src && src !== currentUrl) {
@@ -177,20 +247,49 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
 
       {/* Small Refresh Button - ALWAYS AVAILABLE on hover or tap, or prominently if error */}
       {showRefreshOverlay && (
-        <button
-          type="button"
-          onClick={handleFetchAlternativeImage}
-          disabled={isLoading}
-          className={`absolute bottom-1 right-1 p-1.5 rounded-full shadow-md transition-all z-10 cursor-pointer flex items-center justify-center ${
-            hasError
-              ? "bg-[#A94A42] text-white hover:bg-[#8E3E37] ring-2 ring-white scale-100 opacity-100"
-              : "bg-black/75 hover:bg-[#A94A42] text-white opacity-80 group-hover/cover:opacity-100 hover:scale-110"
-          }`}
-          title="Tap to request another image reference / refresh cover art"
-        >
-          <RefreshCw className={`w-3 h-3 ${isLoading ? "animate-spin" : ""}`} />
-        </button>
+        <div className="absolute bottom-1 right-1 z-10 flex items-center gap-1">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handlePhotoFileChange}
+          />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsScanModalOpen(true);
+            }}
+            disabled={isLoading}
+            className="p-1.5 rounded-full shadow-md transition-all cursor-pointer flex items-center justify-center bg-black/75 hover:bg-[#2D4A3E] text-white opacity-80 group-hover/cover:opacity-100 hover:scale-110"
+            title="Scan a photo of your own copy instead"
+          >
+            <Camera className="w-3 h-3" />
+          </button>
+          <button
+            type="button"
+            onClick={handleFetchAlternativeImage}
+            disabled={isLoading}
+            className={`p-1.5 rounded-full shadow-md transition-all cursor-pointer flex items-center justify-center ${
+              hasError
+                ? "bg-[#A94A42] text-white hover:bg-[#8E3E37] ring-2 ring-white scale-100 opacity-100"
+                : "bg-black/75 hover:bg-[#A94A42] text-white opacity-80 group-hover/cover:opacity-100 hover:scale-110"
+            }`}
+            title="Tap to request another image reference / refresh cover art"
+          >
+            <RefreshCw className={`w-3 h-3 ${isLoading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
       )}
+
+      <CoverScanModal
+        isOpen={isScanModalOpen}
+        onClose={() => setIsScanModalOpen(false)}
+        onCapture={handleScanCapture}
+        onFallbackToFile={() => fileInputRef.current?.click()}
+      />
     </div>
   );
 };
