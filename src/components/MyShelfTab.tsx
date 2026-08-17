@@ -19,7 +19,8 @@ import {
   ArrowLeft,
   Package,
   Grid3x3,
-  Disc3
+  Disc3,
+  Upload
 } from "lucide-react";
 import { ShelfItem, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { exportToCSV, exportToJSON } from "../utils/valuation";
@@ -37,6 +38,7 @@ interface MyShelfTabProps {
   onEditItem: (item: ShelfItem) => void;
   onDeleteItem: (id: string) => void;
   onGoToScan: () => void;
+  onImportItems: (items: ShelfItem[]) => void;
 }
 
 export const MyShelfTab: React.FC<MyShelfTabProps> = ({
@@ -45,8 +47,34 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   onEditItem,
   onDeleteItem,
   onGoToScan,
+  onImportItems,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const importFileInputRef = React.useRef<HTMLInputElement>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImportError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string);
+        const arr = Array.isArray(parsed) ? parsed : null;
+        if (!arr) throw new Error("File must contain a JSON array of records.");
+        const invalidIndex = arr.findIndex((it) => !it || typeof it.albumTitle !== "string" || typeof it.artist !== "string");
+        if (invalidIndex !== -1) {
+          throw new Error(`Record at position ${invalidIndex + 1} is missing an albumTitle/artist.`);
+        }
+        onImportItems(arr as ShelfItem[]);
+      } catch (err) {
+        setImportError(err instanceof Error ? err.message : "Could not read that file as a valid VinylVault JSON export.");
+      }
+    };
+    reader.readAsText(file);
+  };
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
@@ -353,8 +381,23 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             </select>
           </div>
 
-          {/* Export Buttons */}
+          {/* Import + Export Buttons */}
           <div className="flex items-center gap-2">
+            <input
+              ref={importFileInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={handleImportFileChange}
+            />
+            <button
+              onClick={() => importFileInputRef.current?.click()}
+              className="px-3 py-1.5 rounded-md bg-[#EFEAE0] text-[#2B2B2B] border border-[#D8D0C0] hover:bg-[#FAF8F3] text-xs font-sans font-bold uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer"
+              title="Import Collection from JSON"
+            >
+              <Upload className="w-3.5 h-3.5 text-[#6B655B]" />
+              <span>Import</span>
+            </button>
             <button
               onClick={() => exportToCSV(shelfItems)}
               disabled={shelfItems.length === 0}
@@ -376,6 +419,11 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             </button>
           </div>
         </div>
+        {importError && (
+          <div className="text-xs font-sans text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+            Import failed: {importError}
+          </div>
+        )}
       </div>
 
       {/* Genre + Style Multi-Select Filter Panel */}

@@ -31,79 +31,7 @@ import {
 import type { Unsubscribe } from "firebase/firestore";
 
 // Initial seed records if shelf is totally fresh
-const INITIAL_SEED_SHELF: ShelfItem[] = [
-  {
-    id: "seed-1",
-    albumTitle: "The Dark Side of the Moon",
-    artist: "Pink Floyd",
-    releaseYear: "1973",
-    label: "Harvest Records",
-    country: "UK",
-    catalogueNumber: "SHVL 804",
-    matrixCode: "SHVL 804 A-2 / B-2",
-    format: "LP, Album, Gatefold, Stereo",
-    genre: "Rock",
-    styles: ["Prog Rock", "Psychedelic Rock"],
-    coverArtUrl: "https://images.unsplash.com/photo-1619983081563-430f63602796?w=600&auto=format&fit=crop&q=80",
-    tracklist: [
-      { position: "A1", title: "Speak to Me", duration: "1:07" },
-      { position: "A2", title: "Breathe (In the Air)", duration: "2:49" },
-      { position: "A3", title: "On the Run", duration: "3:45" },
-      { position: "A4", title: "Time", duration: "6:53" },
-      { position: "A5", title: "The Great Gig in the Sky", duration: "4:44" },
-      { position: "B1", title: "Money", duration: "6:23" },
-      { position: "B2", title: "Us and Them", duration: "7:49" },
-      { position: "B3", title: "Any Colour You Like", duration: "3:26" },
-      { position: "B4", title: "Brain Damage", duration: "3:46" },
-      { position: "B5", title: "Eclipse", duration: "2:12" }
-    ],
-    baseMintValue: { low: 180, median: 260, high: 420 },
-    mediaGrade: "VG+",
-    sleeveGrade: "VG+",
-    calculatedValue: { low: 135, median: 195, high: 315 },
-    purchasePrice: 45,
-    acquisitionCountry: "United Kingdom",
-    acquisitionTransactionType: "Record Store",
-    customNotes: "UK 1st pressing with solid blue triangle label & original blue posters.",
-    isAmbiguous: false,
-    groundingSources: [
-      { title: "Discogs - SHVL 804 UK 1973", uri: "https://www.discogs.com" }
-    ],
-    addedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString()
-  },
-  {
-    id: "seed-2",
-    albumTitle: "Abbey Road",
-    artist: "The Beatles",
-    releaseYear: "1969",
-    label: "Apple Records",
-    country: "UK",
-    catalogueNumber: "PCS 7088",
-    matrixCode: "YEX 749-2 / YEX 750-1",
-    format: "LP, Album, Stereo, Fully Laminated",
-    genre: "Rock",
-    styles: ["Classic Rock", "Pop Rock"],
-    coverArtUrl: "https://images.unsplash.com/photo-1539375665275-f9de415ef9ac?w=600&auto=format&fit=crop&q=80",
-    tracklist: [
-      { position: "A1", title: "Come Together", duration: "4:20" },
-      { position: "A2", title: "Something", duration: "3:03" },
-      { position: "B1", title: "Here Comes the Sun", duration: "3:05" }
-    ],
-    baseMintValue: { low: 120, median: 195, high: 310 },
-    mediaGrade: "NM",
-    sleeveGrade: "VG+",
-    calculatedValue: { low: 90, median: 146, high: 232 },
-    purchasePrice: 35,
-    acquisitionCountry: "USA",
-    acquisitionTransactionType: "Record Store",
-    customNotes: "First UK pressing with aligned apple on rear jacket.",
-    isAmbiguous: false,
-    groundingSources: [
-      { title: "Discogs - PCS 7088", uri: "https://www.discogs.com" }
-    ],
-    addedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 12).toISOString()
-  }
-];
+const INITIAL_SEED_SHELF: ShelfItem[] = [];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"scan" | "shelf" | "insights" | "organise">("scan");
@@ -374,6 +302,57 @@ export default function App() {
     }
   };
 
+  const handleImportItems = (rawItems: ShelfItem[]) => {
+    const existingKeys = new Set(
+      shelfItems.map((i) => `${i.albumTitle}-${i.artist}-${i.catalogueNumber}`.toLowerCase())
+    );
+    const existingIds = new Set(shelfItems.map((i) => i.id));
+
+    const toAdd: ShelfItem[] = [];
+    let skippedDuplicates = 0;
+
+    for (const raw of rawItems) {
+      if (!raw || !raw.albumTitle || !raw.artist) continue;
+      const key = `${raw.albumTitle}-${raw.artist}-${raw.catalogueNumber || ""}`.toLowerCase();
+      if (existingKeys.has(key)) {
+        skippedDuplicates++;
+        continue;
+      }
+      let id = raw.id;
+      if (!id || existingIds.has(id)) {
+        id = `import-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      }
+      existingIds.add(id);
+      existingKeys.add(key);
+      toAdd.push(sanitizeShelfItem({ ...raw, id, addedAt: raw.addedAt || new Date().toISOString() }));
+    }
+
+    if (toAdd.length === 0) {
+      showToast(
+        skippedDuplicates > 0
+          ? `Nothing imported — all ${skippedDuplicates} records already exist on your shelf.`
+          : "Nothing imported — the file had no valid records.",
+        "error"
+      );
+      return;
+    }
+
+    const updated = [...toAdd, ...shelfItems];
+    saveShelfToLocal(updated);
+    showToast(
+      `Imported ${toAdd.length} record${toAdd.length === 1 ? "" : "s"}${
+        skippedDuplicates > 0 ? ` (${skippedDuplicates} duplicate${skippedDuplicates === 1 ? "" : "s"} skipped)` : ""
+      }`
+    );
+    setConfettiTrigger((n) => n + 1);
+
+    if (vaultCode && syncStatus === "connected") {
+      bulkUpsertVaultDocs(vaultCode, "shelfItems", toAdd).catch((err) => {
+        console.error("Failed to sync imported items to vault:", err);
+      });
+    }
+  };
+
   const handleDeleteItem = (id: string) => {
     const item = shelfItems.find((i) => i.id === id);
     const updated = shelfItems.filter((item) => item.id !== id);
@@ -502,6 +481,7 @@ export default function App() {
             onEditItem={handleOpenModalForEdit}
             onDeleteItem={handleDeleteItem}
             onGoToScan={() => setActiveTab("scan")}
+            onImportItems={handleImportItems}
           />
         </div>
 
