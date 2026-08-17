@@ -25,6 +25,10 @@ export function useBodyScrollLock(isLocked: boolean) {
     body.style.right = "0";
     body.style.width = "100%";
     body.style.overflow = "hidden";
+    // Lets other components (the sticky header, notably) know a modal has the page
+    // locked, via a plain DOM class rather than prop-drilling modal state through
+    // every component tree — see useIsScrollLocked.
+    body.classList.add("scroll-locked");
 
     return () => {
       body.style.position = prev.position;
@@ -33,6 +37,7 @@ export function useBodyScrollLock(isLocked: boolean) {
       body.style.right = prev.right;
       body.style.width = prev.width;
       body.style.overflow = prev.overflow;
+      body.classList.remove("scroll-locked");
       window.scrollTo(0, scrollY);
     };
   }, [isLocked]);

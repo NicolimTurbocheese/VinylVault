@@ -1,5 +1,6 @@
 import React from "react";
 import { Search, Library, BarChart3, Disc3, Cloud, CloudOff, Package, Palette, Heart } from "lucide-react";
+import { useIsScrollLocked } from "../hooks/useIsScrollLocked";
 
 interface HeaderProps {
   activeTab: "scan" | "shelf" | "insights" | "organise" | "wantlist";
@@ -20,6 +21,13 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenTheme,
   onOpenCommandPalette,
 }) => {
+  // Hidden entirely (not just visually dimmed under a backdrop) while any modal has
+  // the page scroll-locked — a sticky header sitting above a position:fixed-locked
+  // body is a known source of wheel/trackpad scroll events routing to the wrong
+  // element instead of the modal's own scrollable content.
+  const isScrollLocked = useIsScrollLocked();
+  if (isScrollLocked) return null;
+
   return (
     <header className="sticky top-0 z-40 bg-[#F5F2EB]/95 backdrop-blur-md border-b border-[#E2DCD0]">
       <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8">

@@ -31,7 +31,7 @@ export const ViewDetailsModal: React.FC<ViewDetailsModalProps> = ({ isOpen, onCl
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 py-8 overflow-y-auto animate-fade-in"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 py-8 overflow-y-auto overscroll-contain animate-fade-in"
       onClick={onClose}
     >
       <div
