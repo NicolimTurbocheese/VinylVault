@@ -61,8 +61,54 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   const importFileInputRef = React.useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [coverFetchProgress, setCoverFetchProgress] = useState<{ done: number; total: number; found: number } | null>(null);
+  const [recalcProgress, setRecalcProgress] = useState<{ done: number; total: number; changed: number } | null>(null);
+  const [isRecalcConfirmOpen, setIsRecalcConfirmOpen] = useState(false);
 
   const missingCoverItems = shelfItems.filter((i) => !i.coverArtUrl);
+
+  const handleBulkRecalculate = async () => {
+    const targets = shelfItems;
+    if (targets.length === 0) return;
+    setIsRecalcConfirmOpen(false);
+    setRecalcProgress({ done: 0, total: targets.length, changed: 0 });
+    let changed = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const item = targets[i];
+      try {
+        const res = await fetch(apiUrl("recalculateValuation"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            albumTitle: item.albumTitle,
+            artist: item.artist,
+            catalogueNumber: item.catalogueNumber,
+            country: item.country,
+            label: item.label,
+            genre: item.genre,
+            // Omit baseMintValue on purpose so this always runs through the current
+            // (fixed) heuristic formula from scratch, rather than reusing whatever
+            // baseline the record already had (e.g. a carried-over spreadsheet value).
+            mediaGrade: item.mediaGrade,
+            sleeveGrade: item.sleeveGrade,
+            obiCondition: item.obiCondition,
+            packageInclusions: item.packageInclusions,
+            freeTextNotes: item.customNotes || item.freeTextNotes || "",
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.finalValuation) {
+            onQuickUpdateItem({ ...item, calculatedValue: data.finalValuation });
+            changed++;
+          }
+        }
+      } catch (err) {
+        console.warn("Bulk recalculate failed for", item.albumTitle, err);
+      }
+      setRecalcProgress({ done: i + 1, total: targets.length, changed });
+    }
+    setTimeout(() => setRecalcProgress(null), 4000);
+  };
 
   const handleBulkFetchCovers = async () => {
     const targets = missingCoverItems;
@@ -490,6 +536,21 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                 </span>
               </button>
             )}
+            {shelfItems.length > 0 && (
+              <button
+                onClick={() => setIsRecalcConfirmOpen(true)}
+                disabled={!!recalcProgress}
+                className="px-3 py-1.5 rounded-md bg-[#EFEAE0] text-[#2B2B2B] border border-[#D8D0C0] hover:bg-[#FAF8F3] text-xs font-sans font-bold uppercase tracking-wider flex items-center gap-1.5 transition disabled:opacity-60 cursor-pointer"
+                title="Recalculate every record's Est. Value using the current valuation engine"
+              >
+                <DollarSign className={`w-3.5 h-3.5 text-[#6B655B] ${recalcProgress ? "animate-pulse" : ""}`} />
+                <span>
+                  {recalcProgress
+                    ? `Recalculating ${recalcProgress.done}/${recalcProgress.total}`
+                    : "Recalculate All Values"}
+                </span>
+              </button>
+            )}
             <button
               onClick={() => exportToCSV(shelfItems)}
               disabled={shelfItems.length === 0}
@@ -521,6 +582,11 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             Found real cover art for {coverFetchProgress.found} of {coverFetchProgress.total} records. The rest genuinely
             couldn't be matched (obscure/regional pressings) — those will show a "no cover art" placeholder instead of a
             random unrelated photo.
+          </div>
+        )}
+        {recalcProgress && recalcProgress.done === recalcProgress.total && (
+          <div className="text-xs font-sans text-[#6B655B] bg-[#EFEAE0] border border-[#D8D0C0] rounded-md px-3 py-2">
+            Recalculated {recalcProgress.changed} of {recalcProgress.total} records' Est. Value using the current valuation engine.
           </div>
         )}
       </div>
@@ -825,6 +891,53 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
               <span>Scan First Vinyl Record</span>
             </button>
           )}
+        </div>
+      )}
+
+      {/* Recalculate All Confirmation Modal */}
+      {isRecalcConfirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+          onClick={() => setIsRecalcConfirmOpen(false)}
+        >
+          <div
+            className="bg-[#FAF8F3] border border-[#E2DCD0] rounded-xl p-6 max-w-md w-full space-y-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 text-[#A94A42]">
+              <div className="p-2.5 rounded-full bg-[#A94A42]/10 border border-[#A94A42]/20">
+                <DollarSign className="w-5 h-5 text-[#A94A42]" />
+              </div>
+              <div>
+                <h3 className="text-lg font-serif font-bold text-[#2B2B2B]">Recalculate All Values?</h3>
+                <p className="text-[11px] font-sans text-[#6B655B]">Replaces every record's Est. Value</p>
+              </div>
+            </div>
+
+            <p className="text-xs font-sans text-[#2B2B2B] leading-relaxed bg-[#EFEAE0] p-3 rounded-lg border border-[#D8D0C0]">
+              This runs all <strong className="text-[#A94A42]">{shelfItems.length}</strong> records through the app's valuation
+              engine (using each record's genre, grading, and country) and replaces their current Est. Value with the result.
+              For your imported records, this <strong>overwrites your own spreadsheet estimates</strong> — export a CSV/JSON
+              backup first if you want to keep those numbers on hand.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#E2DCD0]">
+              <button
+                type="button"
+                onClick={() => setIsRecalcConfirmOpen(false)}
+                className="px-4 py-2 rounded-md border border-[#D8D0C0] text-xs font-sans font-bold text-[#6B655B] hover:bg-[#EFEAE0] transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkRecalculate}
+                className="px-4 py-2 rounded-md bg-[#A94A42] hover:bg-[#8E3E37] text-white text-xs font-sans font-bold uppercase tracking-wider transition shadow-sm cursor-pointer"
+              >
+                Recalculate All {shelfItems.length}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
