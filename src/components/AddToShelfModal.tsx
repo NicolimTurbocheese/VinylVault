@@ -225,6 +225,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
           catalogueNumber: activeRecord.catalogueNumber,
           country: activeRecord.country,
           label: activeRecord.label,
+          genre,
           baseMintValue: activeRecord.baseMintValue,
           mediaGrade,
           sleeveGrade,

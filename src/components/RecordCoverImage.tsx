@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { RefreshCw, ImageOff, Check, Camera } from "lucide-react";
+import { RefreshCw, ImageOff, Check, Camera, AlertTriangle } from "lucide-react";
 import { apiUrl } from "../utils/apiBase";
 import { CoverScanModal } from "./CoverScanModal";
 
@@ -72,8 +72,13 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  // When a real image is already showing, an overwrite action (refresh / upload / scan)
+  // is staged here for confirmation instead of applying immediately — protects against
+  // an accidental tap wiping out a cover art that was already correct.
+  const [pendingOverwrite, setPendingOverwrite] = useState<{ kind: "refresh" | "photo"; dataUrl?: string } | null>(null);
+  const hasRealCover = !hasError && !!currentUrl;
 
-  const handleScanCapture = (dataUrl: string) => {
+  const applyDataUrl = (dataUrl: string) => {
     setCurrentUrl(dataUrl);
     setHasError(false);
     setCandidateUrls([]);
@@ -81,10 +86,15 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
     if (onImageChange) onImageChange(dataUrl);
   };
 
-  const handlePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
+  const handleScanCapture = (dataUrl: string) => {
+    if (hasRealCover) {
+      setPendingOverwrite({ kind: "photo", dataUrl });
+    } else {
+      applyDataUrl(dataUrl);
+    }
+  };
+
+  const applyPhotoFile = async (file: File) => {
     setIsLoading(true);
     setStatusMessage("Processing photo...");
     try {
@@ -104,6 +114,18 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
     }
   };
 
+  const handlePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (hasRealCover) {
+      const dataUrl = await fileToCompressedDataUrl(file).catch(() => null);
+      if (dataUrl) setPendingOverwrite({ kind: "photo", dataUrl });
+      return;
+    }
+    applyPhotoFile(file);
+  };
+
   useEffect(() => {
     if (src && src !== currentUrl) {
       setCurrentUrl(src);
@@ -112,8 +134,7 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
   }, [src]);
 
   // Fetch alternative image references from verified server endpoint & iTunes with strict title matching
-  const handleFetchAlternativeImage = async (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
+  const performFetchAlternativeImage = async () => {
     setIsLoading(true);
     setStatusMessage("Finding art...");
 
@@ -209,6 +230,25 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
     }
   };
 
+  const handleFetchAlternativeImage = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (hasRealCover) {
+      setPendingOverwrite({ kind: "refresh" });
+      return;
+    }
+    performFetchAlternativeImage();
+  };
+
+  const confirmOverwrite = () => {
+    if (!pendingOverwrite) return;
+    if (pendingOverwrite.kind === "refresh") {
+      performFetchAlternativeImage();
+    } else if (pendingOverwrite.kind === "photo" && pendingOverwrite.dataUrl) {
+      applyDataUrl(pendingOverwrite.dataUrl);
+    }
+    setPendingOverwrite(null);
+  };
+
   return (
     <div className={`relative overflow-hidden group/cover ${className}`}>
       {/* Primary Image or Fallback */}
@@ -290,6 +330,61 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
         onCapture={handleScanCapture}
         onFallbackToFile={() => fileInputRef.current?.click()}
       />
+
+      {pendingOverwrite && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
+          onClick={(e) => {
+            e.stopPropagation();
+            setPendingOverwrite(null);
+          }}
+        >
+          <div
+            className="bg-[#FAF8F3] border border-[#E2DCD0] rounded-xl p-5 max-w-xs w-full space-y-4 shadow-2xl font-sans"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 text-amber-700">
+              <div className="p-2 rounded-full bg-amber-100 border border-amber-300">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <h3 className="text-sm font-bold text-[#2B2B2B]">Replace current cover art?</h3>
+            </div>
+            <div className="flex items-center gap-3">
+              <img src={currentUrl} alt="Current cover" className="w-16 h-16 rounded object-cover border border-[#D8D0C0]" />
+              <span className="text-xs text-[#6B655B]">→</span>
+              {pendingOverwrite.kind === "photo" && pendingOverwrite.dataUrl && (
+                <img src={pendingOverwrite.dataUrl} alt="New cover" className="w-16 h-16 rounded object-cover border border-[#D8D0C0]" />
+              )}
+              {pendingOverwrite.kind === "refresh" && (
+                <div className="w-16 h-16 rounded bg-[#EFEAE0] border border-[#D8D0C0] flex items-center justify-center">
+                  <RefreshCw className="w-5 h-5 text-[#A94A42]" />
+                </div>
+              )}
+            </div>
+            <p className="text-[11px] text-[#6B655B] leading-relaxed">
+              This record already has a cover image set. {pendingOverwrite.kind === "refresh"
+                ? "Searching again will replace it with a different match."
+                : "Saving this photo will replace it."}
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setPendingOverwrite(null)}
+                className="px-3 py-1.5 rounded-md border border-[#D8D0C0] text-[11px] font-bold uppercase tracking-wider text-[#6B655B] hover:bg-[#EFEAE0] transition cursor-pointer"
+              >
+                Keep Current
+              </button>
+              <button
+                type="button"
+                onClick={confirmOverwrite}
+                className="px-3 py-1.5 rounded-md bg-[#A94A42] hover:bg-[#8E3E37] text-white text-[11px] font-bold uppercase tracking-wider transition cursor-pointer"
+              >
+                Replace
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

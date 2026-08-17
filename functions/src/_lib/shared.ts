@@ -444,6 +444,7 @@ export function calculateSmartDynamicValuation(data: {
   format?: string;
   catalogueNumber?: string;
   matrixCode?: string;
+  genre?: string;
   community?: { want?: number; have?: number };
   marketNotes?: string;
   ebayCitations?: any[];
@@ -508,6 +509,7 @@ export function calculateSmartDynamicValuation(data: {
   const country = (data.country || "").toLowerCase();
   const format = (data.format || "").toLowerCase();
   const label = (data.label || "").toLowerCase();
+  const genre = (data.genre || "").toLowerCase();
 
   // Baseline for an ordinary, unremarkable secondhand pressing in the Singapore market —
   // most common titles sell in roughly the S$15-40 range at local record stores (Roxy,
@@ -516,13 +518,23 @@ export function calculateSmartDynamicValuation(data: {
   // just "it's a record." This intentionally starts low and lets the bonuses below do the
   // work of pushing genuinely special pressings up, rather than starting high and treating
   // every record as inherently valuable.
-  let baseMed = 42;
+  // Classical and easy-listening/vocal-pop genres were pressed in huge numbers through
+  // the mid-20th century and are common/cheap in secondhand bins even when old — unlike
+  // rock/jazz/soul from the same era, where "pre-1970" is a real scarcity signal. Found via
+  // real user data (164 real purchases compared against their own market estimates): the
+  // fallback ran ~S$30/record too high on average, worst on exactly these two genres, and
+  // just softening the era bonus wasn't enough — these genres are generally lower-value
+  // across the board, so the starting baseline itself needs to be lower, not just the bonus.
+  const isCommonEraGenre = genre === "classical" || genre === "stage & screen" ||
+    (genre === "pop" && /vocal|easy listening|standards|crooner/.test((data.format || "") + (data.marketNotes || "")));
+  let baseMed = isCommonEraGenre ? 20 : 42;
+  const eraMultiplier = isCommonEraGenre ? 0.4 : 1;
 
   if (!isNaN(year) && year > 1940) {
     if (year < 1970) {
-      baseMed += 45;
+      baseMed += Math.round(45 * eraMultiplier);
     } else if (year < 1980) {
-      baseMed += 25;
+      baseMed += Math.round(25 * eraMultiplier);
     } else if (year >= 1990 && year < 2005) {
       baseMed += 20;
     } else if (year >= 2005 && year < 2020) {
@@ -730,6 +742,7 @@ export async function searchDiscogsLive(catNo?: string, matrixCode?: string, rec
             format: formatStr,
             catalogueNumber: catNumber,
             matrixCode: matrixStr,
+            genre: normG.genre,
             community: rel.community
           });
 

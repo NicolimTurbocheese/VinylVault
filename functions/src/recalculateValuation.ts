@@ -19,6 +19,7 @@ export const recalculateValuation = onRequest(
         catalogueNumber,
         country = "US",
         label,
+        genre,
         baseMintValue,
         mediaGrade = "NM",
         sleeveGrade = "NM",
@@ -34,7 +35,8 @@ export const recalculateValuation = onRequest(
           artist,
           catalogueNumber,
           country,
-          label
+          label,
+          genre
         });
       }
 
