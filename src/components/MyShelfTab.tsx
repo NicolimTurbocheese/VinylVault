@@ -40,6 +40,7 @@ import { apiUrl } from "../utils/apiBase";
 import { findDuplicateGroups, DuplicateGroup } from "../utils/duplicateCheck";
 import { RecordCoverImage } from "./RecordCoverImage";
 import { CoverflowCarousel } from "./CoverflowCarousel";
+import { ViewDetailsModal } from "./ViewDetailsModal";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { useCountUp } from "../hooks/useCountUp";
@@ -299,8 +300,9 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   const [viewMode, setViewMode] = useState<"grid" | "coverflow">("grid");
   const [cardDensity, setCardDensity] = useState<"detailed" | "compact">("detailed");
   const [itemToDelete, setItemToDelete] = useState<ShelfItem | null>(null);
+  const [itemToView, setItemToView] = useState<ShelfItem | null>(null);
 
-  const anyModalOpen = !!itemToDelete || isClearAllConfirmOpen || isRecalcConfirmOpen || !!duplicateGroups || !!randomPick || isBulkDeleteConfirmOpen;
+  const anyModalOpen = !!itemToDelete || isClearAllConfirmOpen || isRecalcConfirmOpen || !!duplicateGroups || !!randomPick || isBulkDeleteConfirmOpen || !!itemToView;
   useEscapeToClose(anyModalOpen, () => {
     setItemToDelete(null);
     setIsClearAllConfirmOpen(false);
@@ -308,6 +310,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
     setDuplicateGroups(null);
     setRandomPick(null);
     setIsBulkDeleteConfirmOpen(false);
+    setItemToView(null);
   });
   useBodyScrollLock(anyModalOpen);
 
@@ -1198,6 +1201,13 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
 
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={() => setItemToView(item)}
+                    className="p-1.5 rounded text-[#6B655B] hover:text-[#A94A42] hover:bg-[#EFEAE0] transition cursor-pointer"
+                    title="View Record Details"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                  </button>
+                  <button
                     onClick={() => onEditItem(item)}
                     className="p-1.5 rounded text-[#6B655B] hover:text-[#A94A42] hover:bg-[#EFEAE0] transition cursor-pointer"
                     title="Edit Record Details"
@@ -1558,6 +1568,14 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
           </div>
         </div>
       )}
+
+      <ViewDetailsModal
+        isOpen={!!itemToView}
+        onClose={() => setItemToView(null)}
+        item={itemToView}
+        boxes={boxes}
+        onEdit={onEditItem}
+      />
     </div>
   );
 };
