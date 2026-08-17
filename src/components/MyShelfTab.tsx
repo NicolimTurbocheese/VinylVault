@@ -302,7 +302,11 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   const [itemToDelete, setItemToDelete] = useState<ShelfItem | null>(null);
   const [itemToView, setItemToView] = useState<ShelfItem | null>(null);
 
-  const anyModalOpen = !!itemToDelete || isClearAllConfirmOpen || isRecalcConfirmOpen || !!duplicateGroups || !!randomPick || isBulkDeleteConfirmOpen || !!itemToView;
+  // Note: ViewDetailsModal (itemToView) manages its own escape-close and body-scroll-lock
+  // internally, like every other standalone modal component (CoverScanModal, SubgenreManagerModal,
+  // etc.) — it must NOT also be included here, or two independent (non-reference-counted) lock
+  // hooks fight over restoring document.body's scroll state and leave it stuck locked on close.
+  const anyModalOpen = !!itemToDelete || isClearAllConfirmOpen || isRecalcConfirmOpen || !!duplicateGroups || !!randomPick || isBulkDeleteConfirmOpen;
   useEscapeToClose(anyModalOpen, () => {
     setItemToDelete(null);
     setIsClearAllConfirmOpen(false);
@@ -310,7 +314,6 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
     setDuplicateGroups(null);
     setRandomPick(null);
     setIsBulkDeleteConfirmOpen(false);
-    setItemToView(null);
   });
   useBodyScrollLock(anyModalOpen);
 
