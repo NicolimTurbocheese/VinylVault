@@ -605,8 +605,17 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {/* 1. Final Est. Value (editable — overrides the computed value) */}
                   <div className="p-3.5 rounded-lg bg-[#EFEAE0] border border-[#D8D0C0] flex flex-col justify-between">
-                    <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] block mb-1">
-                      Final Est. Value
+                    <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center justify-between gap-1">
+                      <span>Final Est. Value</span>
+                      <button
+                        type="button"
+                        onClick={handleRerunResearch}
+                        disabled={isRecalculating}
+                        title="Refresh this record's value using the current valuation engine"
+                        className="text-[#A94A42] hover:text-[#8E3E37] disabled:opacity-50 cursor-pointer"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${isRecalculating ? "animate-spin" : ""}`} />
+                      </button>
                     </span>
                     <div className="flex items-center gap-1 text-[#A94A42]">
                       <span className="text-lg sm:text-xl font-serif font-bold">S$</span>
