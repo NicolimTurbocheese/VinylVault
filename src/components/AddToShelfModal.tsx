@@ -56,6 +56,8 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
   const [styleInput, setStyleInput] = useState<string>("");
   const [boxId, setBoxId] = useState<string>(UNCATEGORISED_BOX_ID);
   const [matrixCode, setMatrixCode] = useState<string>("");
+  const [albumTitle, setAlbumTitle] = useState<string>("");
+  const [artist, setArtist] = useState<string>("");
   const [purchaseDate, setPurchaseDate] = useState<string>(todayIso());
   const [subgenreLibrary, setSubgenreLibrary] = useState<string[]>(() => getStoredSubgenres());
   const [isSubgenreManagerOpen, setIsSubgenreManagerOpen] = useState(false);
@@ -96,6 +98,8 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
       setCustomNotes(existingItem.customNotes || existingItem.freeTextNotes || "");
       setCustomValuationAdj("0");
       setMatrixCode(existingItem.matrixCode || "");
+      setAlbumTitle(existingItem.albumTitle || "");
+      setArtist(existingItem.artist || "");
       setPurchaseDate(existingItem.purchaseDate || (existingItem.addedAt ? existingItem.addedAt.slice(0, 10) : todayIso()));
       setProposedValuation(null);
       researchSnapshotRef.current = {
@@ -145,6 +149,8 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
       setCustomNotes(aggregatedAutoNotes || record.customNotes || "");
       setCustomValuationAdj((record as any).initialValuationAdj !== undefined ? String((record as any).initialValuationAdj) : "0");
       setMatrixCode(record.matrixCode || "");
+      setAlbumTitle(record.albumTitle || "");
+      setArtist(record.artist || "");
       setPurchaseDate(todayIso());
       setProposedValuation(null);
       researchSnapshotRef.current = null;
@@ -270,6 +276,8 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
 
     const shelfPayload: ShelfItem = {
       ...activeRecord,
+      albumTitle: albumTitle.trim() || activeRecord.albumTitle,
+      artist: artist.trim() || activeRecord.artist,
       coverArtUrl: coverArtUrl || activeRecord.coverArtUrl,
       genre,
       styles,
@@ -337,9 +345,21 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
               imgClassName="w-full h-full object-cover rounded"
             />
             <div className="flex-1 min-w-0">
-              <h4 className="font-serif font-bold text-base text-[#2B2B2B] truncate">{activeRecord.albumTitle}</h4>
-              <p className="text-xs font-serif text-[#A94A42] truncate font-medium">{activeRecord.artist}</p>
-              
+              <input
+                type="text"
+                value={albumTitle}
+                onChange={(e) => setAlbumTitle(e.target.value)}
+                placeholder="Album Title"
+                className="w-full font-serif font-bold text-base text-[#2B2B2B] bg-transparent border-b border-transparent hover:border-[#D8D0C0] focus:border-[#A94A42] focus:outline-none transition px-0 py-0.5"
+              />
+              <input
+                type="text"
+                value={artist}
+                onChange={(e) => setArtist(e.target.value)}
+                placeholder="Artist"
+                className="w-full text-xs font-serif text-[#A94A42] font-medium bg-transparent border-b border-transparent hover:border-[#D8D0C0] focus:border-[#A94A42] focus:outline-none transition px-0 py-0.5 mt-0.5"
+              />
+
               {/* Cat#, Matrix, Barcode, Year, Publisher - All uniform plain text design */}
               <div className="flex items-center gap-x-2 gap-y-0.5 mt-1 text-[11px] font-sans text-[#6B655B] flex-wrap leading-relaxed">
                 {activeRecord.catalogueNumber && (

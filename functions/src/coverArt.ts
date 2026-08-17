@@ -31,11 +31,22 @@ export const coverArt = onRequest(
       };
 
       // Extract main album title (remove parenthetical subtitles like (The Original Soundtrack...))
-      const cleanTitle = albumTitle.replace(/\s*\([^)]*\)/g, "").trim();
+      // and common shorthand suffixes collectors log ("Grease - OST") that official
+      // Discogs/iTunes/MusicBrainz listings never contain verbatim ("Grease (Original
+      // Motion Picture Soundtrack)") — without stripping these, the substring match
+      // never fires even though it's obviously the same album.
+      const cleanTitle = albumTitle
+        .replace(/\s*\([^)]*\)/g, "")
+        .replace(/\s*[-–—:]\s*(the\s+)?(original\s+)?(motion\s+picture\s+)?(soundtrack|ost)\s*$/i, "")
+        .trim();
       const mainKeyword = (cleanTitle.length >= 3 ? cleanTitle : albumTitle).toLowerCase();
 
-      // Check if artist is generic
-      const isVarious = !artist || /various|v\/a|soundtrack|ost/i.test(artist);
+      // Check if artist is generic — also true when the ALBUM TITLE itself flags it as a
+      // soundtrack/OST even though a specific collaborator's name was logged as the
+      // artist (e.g. "Barry Gibb, Olivia Newton-John" for the Grease soundtrack): Discogs
+      // conventionally credits these as "Various", so requiring an exact match on the
+      // logged collaborator name would reject the correct release.
+      const isVarious = !artist || /various|v\/a|soundtrack|ost/i.test(artist) || /soundtrack|\bost\b/i.test(albumTitle);
       const cleanArtist = isVarious ? "" : artist.replace(/\s*\([^)]*\)/g, "").trim();
 
       // Discogs formats "The Beatles" as "Beatles, The" inside a "Beatles, The - Abbey Road"
@@ -51,6 +62,12 @@ export const coverArt = onRequest(
       const isPlaceholderCatNo = (v: string) =>
         !v || ["cat-no", "n/a", "barcode", "unknown", "none", "-", "tbd"].includes(v.trim().toLowerCase());
 
+      // Multi-disc box sets are sometimes logged as a comma/slash-joined run of catalogue
+      // numbers (e.g. "VIM-14,15,16" for a 3-LP set) — Discogs' catno field expects one
+      // exact number, so searching the joined string verbatim reliably returns nothing.
+      // Use just the first number in the run for the indexed search.
+      const primaryCatNo = (v: string) => v.split(/[,/]/)[0].trim();
+
       // 1. Query Discogs API by Catalogue Number, Matrix/Runout Code, or Clean Title.
       // Catalogue number is the strongest signal (Discogs' catno= field is indexed
       // directly); the matrix/runout code isn't a dedicated search field on Discogs, so
@@ -62,7 +79,7 @@ export const coverArt = onRequest(
         // the actual vinyl pressing and hand back a wrong/incomplete tracklist.
         let discogsQuery = "";
         if (catalogueNumber && !isPlaceholderCatNo(catalogueNumber)) {
-          discogsQuery = `https://api.discogs.com/database/search?catno=${encodeURIComponent(catalogueNumber)}&format=Vinyl&type=release`;
+          discogsQuery = `https://api.discogs.com/database/search?catno=${encodeURIComponent(primaryCatNo(catalogueNumber))}&format=Vinyl&type=release`;
         } else if (matrixCode) {
           const q = [cleanArtist, cleanTitle, matrixCode].filter(Boolean).join(" ");
           discogsQuery = `https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&format=Vinyl&type=release`;
@@ -258,7 +275,7 @@ export const coverArt = onRequest(
       if (results.length < 2 || tracklist.length === 0) {
         try {
           const mbq = catalogueNumber && !isPlaceholderCatNo(catalogueNumber)
-            ? `catno:${catalogueNumber}`
+            ? `catno:${primaryCatNo(catalogueNumber)}`
             : `release:"${cleanTitle}" AND artist:"${cleanArtist || 'Various Artists'}"`;
           const mbRes = await fetch(`https://musicbrainz.org/ws/2/release/?query=${encodeURIComponent(mbq)}&fmt=json`, {
             headers: { "User-Agent": "VinylVault/1.0 (contact@vinylvault.app)" }

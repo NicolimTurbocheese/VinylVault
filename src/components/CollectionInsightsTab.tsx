@@ -123,10 +123,11 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
 
   // 5. Collection value over time — a running total of estimated value as records were
   // acquired. Prefer the real purchase date over "Added" date: a bulk import (or any
-  // batch entry) gives many records the same addedAt timestamp, which collapses the
-  // whole batch into one vertical jump instead of a real timeline. Items missing a
-  // purchaseDate fall back to addedAt. Same-day entries are merged into a single point
-  // so the axis doesn't fill up with stacked duplicate dates. This tracks how the
+  // batch entry) gives many records the same addedAt timestamp, which used to collapse
+  // the whole batch into one vertical jump instead of a real timeline. One point is
+  // plotted per item (not merged by day) — a collection where most records lack a
+  // purchaseDate would otherwise collapse to a single shared date and disappear below
+  // the "more than one point" threshold that gates this chart. This tracks how the
   // collection's value grew as it was built (acquisition order), not fluctuations in an
   // already-owned item's market price over time — the app doesn't take periodic
   // re-valuation snapshots, so a true "market price history" chart isn't something
@@ -137,22 +138,14 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
       .filter((x): x is { item: ShelfItem; dateStr: string } => !!x.dateStr && !isNaN(new Date(x.dateStr).getTime()))
       .sort((a, b) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime());
 
-    const byDay = new Map<string, number>();
-    for (const { item, dateStr } of dated) {
-      const dayKey = new Date(dateStr).toISOString().slice(0, 10);
-      byDay.set(dayKey, (byDay.get(dayKey) || 0) + (item.calculatedValue?.median || 0));
-    }
-
     let running = 0;
-    return Array.from(byDay.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([dayKey, dayValue]) => {
-        running += dayValue;
-        return {
-          date: new Date(dayKey).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" }),
-          value: running,
-        };
-      });
+    return dated.map(({ item, dateStr }) => {
+      running += item.calculatedValue?.median || 0;
+      return {
+        date: new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" }),
+        value: running,
+      };
+    });
   })();
 
   // 5. Top 5 Most Valuable
