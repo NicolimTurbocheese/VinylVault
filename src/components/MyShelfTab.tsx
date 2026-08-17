@@ -235,6 +235,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
         console.warn("Bulk cover fetch failed for", item.albumTitle, err);
       }
       setCoverFetchProgress({ done: i + 1, total: targets.length, found });
+      await new Promise((resolve) => setTimeout(resolve, 400));
     }
     setTimeout(() => setCoverFetchProgress(null), 4000);
   };
@@ -265,6 +266,10 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
         console.warn("Bulk tracklist fetch failed for", item.albumTitle, err);
       }
       setTracklistFetchProgress({ done: i + 1, total: targets.length, found });
+      // A brief pause between records — MusicBrainz (the main tracklist fallback
+      // source) enforces roughly 1 request/second and silently rate-limits a long
+      // unthrottled run, which was causing many records to come back empty.
+      await new Promise((resolve) => setTimeout(resolve, 400));
     }
     setTimeout(() => setTracklistFetchProgress(null), 4000);
   };

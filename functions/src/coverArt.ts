@@ -57,20 +57,31 @@ export const coverArt = onRequest(
       // it's folded into the free-text query as the next-best pressing-specific signal
       // when there's no usable catalogue number.
       try {
+        // Bias toward the Vinyl edition specifically — without this, a CD reissue or
+        // a bonus-track-laden compilation sharing the same artist/title can outrank
+        // the actual vinyl pressing and hand back a wrong/incomplete tracklist.
         let discogsQuery = "";
         if (catalogueNumber && !isPlaceholderCatNo(catalogueNumber)) {
-          discogsQuery = `https://api.discogs.com/database/search?catno=${encodeURIComponent(catalogueNumber)}&type=release`;
+          discogsQuery = `https://api.discogs.com/database/search?catno=${encodeURIComponent(catalogueNumber)}&format=Vinyl&type=release`;
         } else if (matrixCode) {
           const q = [cleanArtist, cleanTitle, matrixCode].filter(Boolean).join(" ");
-          discogsQuery = `https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release`;
+          discogsQuery = `https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&format=Vinyl&type=release`;
         } else {
           const q = [cleanArtist, cleanTitle].filter(Boolean).join(" ");
-          discogsQuery = `https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release`;
+          discogsQuery = `https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&format=Vinyl&type=release`;
         }
 
-        const dRes = await fetch(discogsQuery, { headers: discogsHeaders });
+        let dRes = await fetch(discogsQuery, { headers: discogsHeaders });
+        let dJson: any = dRes.ok ? await dRes.json() : null;
+        // The Vinyl-only filter can legitimately return nothing (format tagged
+        // differently, or missing on Discogs for this release) — fall back to an
+        // unfiltered search rather than losing the match entirely.
+        if (!dJson?.results?.length && discogsQuery.includes("&format=Vinyl")) {
+          const fallbackQuery = discogsQuery.replace("&format=Vinyl", "");
+          dRes = await fetch(fallbackQuery, { headers: discogsHeaders });
+          dJson = dRes.ok ? await dRes.json() : null;
+        }
         if (dRes.ok) {
-          const dJson: any = await dRes.json();
           if (dJson.results && dJson.results.length > 0) {
             for (const r of dJson.results) {
               const img = r.cover_image || r.thumb;
@@ -181,8 +192,11 @@ export const coverArt = onRequest(
         }
       }
 
-      // 4. Fallback to MusicBrainz / CoverArtArchive
-      if (results.length < 2) {
+      // 4. Fallback to MusicBrainz / CoverArtArchive — also the tracklist fallback when
+      // Discogs didn't turn one up, so this must run whenever tracklist is still empty,
+      // not only when cover art is still insufficient (iTunes/Deezer finding a cover
+      // shouldn't skip the only other tracklist source available).
+      if (results.length < 2 || tracklist.length === 0) {
         try {
           const mbq = catalogueNumber && !isPlaceholderCatNo(catalogueNumber)
             ? `catno:${catalogueNumber}`
@@ -193,12 +207,22 @@ export const coverArt = onRequest(
           if (mbRes.ok) {
             const mbJson: any = await mbRes.json();
             if (mbJson.releases && mbJson.releases.length > 0) {
-              for (const rel of mbJson.releases) {
+              const matched = mbJson.releases.filter((rel: any) => {
                 const relTitle = (rel.title || "").toLowerCase();
                 const relArtist = (rel["artist-credit"]?.[0]?.name || "").toLowerCase();
                 const matchesTitle = relTitle.includes(mainKeyword) || mainKeyword.includes(relTitle);
                 const matchesArtist = normalizedArtist ? normalizeArtistName(relArtist).includes(normalizedArtist) : true;
-                if (!matchesTitle || !matchesArtist) continue;
+                return matchesTitle && matchesArtist;
+              });
+              // Prefer the Vinyl-tagged release when the search returned several
+              // pressings/editions — a CD or digital edition with the same title can
+              // otherwise outrank the vinyl pressing and hand back a wrong tracklist
+              // (bonus tracks, different running order, etc).
+              const isVinylRelease = (rel: any) =>
+                Array.isArray(rel.media) && rel.media.some((m: any) => /vinyl/i.test(m?.format || ""));
+              matched.sort((a: any, b: any) => Number(isVinylRelease(b)) - Number(isVinylRelease(a)));
+
+              for (const rel of matched) {
 
                 const caaUrl = `https://coverartarchive.org/release/${rel.id}/front-500`;
                 if (!results.includes(caaUrl)) {
@@ -213,14 +237,23 @@ export const coverArt = onRequest(
                     );
                     if (relDetailRes.ok) {
                       const relDetail: any = await relDetailRes.json();
-                      const media = relDetail?.media?.[0];
-                      const mbTracks: any[] = media?.tracks || [];
+                      // A double (or triple) LP is multiple "media" entries, one per disc —
+                      // reading only media[0] silently dropped every side after the first.
+                      const mediaList: any[] = relDetail?.media || [];
+                      const multiDisc = mediaList.length > 1;
+                      const mbTracks: { t: any; idx: number; discNo: number }[] = [];
+                      mediaList.forEach((media, discIdx) => {
+                        (media?.tracks || []).forEach((t: any, idx: number) => {
+                          mbTracks.push({ t, idx, discNo: discIdx + 1 });
+                        });
+                      });
                       if (mbTracks.length > 0) {
-                        tracklist = mbTracks.map((t, idx) => {
+                        tracklist = mbTracks.map(({ t, idx, discNo }) => {
                           const durMs = t.length || t.recording?.length;
                           const durStr = durMs ? `${Math.floor(durMs / 60000)}:${String(Math.floor((durMs % 60000) / 1000)).padStart(2, "0")}` : undefined;
+                          const basePos = t.number || String(idx + 1);
                           return {
-                            position: t.number || String(idx + 1),
+                            position: multiDisc ? `${discNo}-${basePos}` : basePos,
                             title: t.title || t.recording?.title || `Track ${idx + 1}`,
                             duration: durStr,
                           };
