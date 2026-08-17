@@ -7,6 +7,7 @@ import { normalizeDiscogsGenre, DISCOGS_MACRO_GENRES } from "../utils/genre";
 import { ACQUISITION_COUNTRIES, ACQUISITION_TRANSACTION_TYPES } from "../utils/acquisitionOptions";
 import { RecordCoverImage } from "./RecordCoverImage";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface AddToShelfModalProps {
   isOpen: boolean;
@@ -111,6 +112,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
   }, [existingItem, record, isOpen]);
 
   useEscapeToClose(isOpen, onClose);
+  useBodyScrollLock(isOpen);
 
   if (!isOpen || (!record && !existingItem)) return null;
 

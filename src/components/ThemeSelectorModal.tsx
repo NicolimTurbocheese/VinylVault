@@ -1,6 +1,7 @@
 import React from "react";
 import { Palette, Check, Sparkles, X } from "lucide-react";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 export type UITheme = "gold" | "nordic" | "swiss" | "cyber";
 
@@ -108,6 +109,7 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
   onSelectTheme,
 }) => {
   useEscapeToClose(isOpen, onClose);
+  useBodyScrollLock(isOpen);
 
   if (!isOpen) return null;
 

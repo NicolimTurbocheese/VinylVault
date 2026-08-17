@@ -13,6 +13,7 @@ import {
 import { ShelfItem, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { RecordCoverImage } from "./RecordCoverImage";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface OrganiseTabProps {
   boxes: VinylBox[];
@@ -39,6 +40,7 @@ export const OrganiseTab: React.FC<OrganiseTabProps> = ({
   const [boxToDelete, setBoxToDelete] = useState<VinylBox | null>(null);
 
   useEscapeToClose(!!boxToDelete, () => setBoxToDelete(null));
+  useBodyScrollLock(!!boxToDelete);
 
   const itemsForBox = (boxId: string) => {
     if (boxId === UNCATEGORISED_BOX_ID) {

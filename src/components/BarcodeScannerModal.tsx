@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Barcode, X, AlertCircle } from "lucide-react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface BarcodeScannerModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   };
 
   useEscapeToClose(isOpen, handleClose);
+  useBodyScrollLock(isOpen);
 
   useEffect(() => {
     if (isOpen) {

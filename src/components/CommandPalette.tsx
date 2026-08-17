@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Disc3, Library, BarChart3, Package, Cloud, Palette, CornerDownLeft, ArrowUp, ArrowDown } from "lucide-react";
 import { ShelfItem } from "../types";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 type Tab = "scan" | "shelf" | "insights" | "organise";
 
@@ -37,6 +38,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEscapeToClose(isOpen, onClose);
+  useBodyScrollLock(isOpen);
 
   useEffect(() => {
     if (isOpen) {

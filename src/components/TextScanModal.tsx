@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { ScanText, X, RefreshCw, Radio } from "lucide-react";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface TextScanModalProps {
   isOpen: boolean;
@@ -52,6 +53,7 @@ export const TextScanModal: React.FC<TextScanModalProps> = ({ isOpen, onClose, o
   };
 
   useEscapeToClose(isOpen, handleClose);
+  useBodyScrollLock(isOpen);
 
   const startCamera = async (mode: "environment" | "user") => {
     setErrorMsg(null);

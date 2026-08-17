@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { Camera, X, RefreshCw, CheckCircle } from "lucide-react";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 interface CameraModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   };
 
   useEscapeToClose(isOpen, handleClose);
+  useBodyScrollLock(isOpen);
 
   useEffect(() => {
     if (isOpen) {

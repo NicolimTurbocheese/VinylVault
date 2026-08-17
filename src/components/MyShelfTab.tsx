@@ -28,6 +28,7 @@ import { normalizeDiscogsGenre, DISCOGS_MACRO_GENRES } from "../utils/genre";
 import { RecordCoverImage } from "./RecordCoverImage";
 import { CoverflowCarousel } from "./CoverflowCarousel";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { useCountUp } from "../hooks/useCountUp";
 
 interface MyShelfTabProps {
@@ -54,6 +55,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   const [itemToDelete, setItemToDelete] = useState<ShelfItem | null>(null);
 
   useEscapeToClose(!!itemToDelete, () => setItemToDelete(null));
+  useBodyScrollLock(!!itemToDelete);
 
   const recentlyAdded = [...shelfItems]
     .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())

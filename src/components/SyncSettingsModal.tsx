@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Cloud, CloudOff, Copy, Check, X, Link2, AlertTriangle, Loader2 } from "lucide-react";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
 export type SyncStatus = "disabled" | "connecting" | "connected" | "error";
 
@@ -31,6 +32,7 @@ export const SyncSettingsModal: React.FC<SyncSettingsModalProps> = ({
   const [copied, setCopied] = useState(false);
 
   useEscapeToClose(isOpen, onClose);
+  useBodyScrollLock(isOpen);
 
   if (!isOpen) return null;
 
