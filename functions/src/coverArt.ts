@@ -77,8 +77,15 @@ export const coverArt = onRequest(
         // Bias toward the Vinyl edition specifically — without this, a CD reissue or
         // a bonus-track-laden compilation sharing the same artist/title can outrank
         // the actual vinyl pressing and hand back a wrong/incomplete tracklist.
+        // When the search was keyed off an exact catalogue number, the catno match itself
+        // already proves it's the right release — Discogs' catno field is indexed per
+        // pressing, not fuzzy. Trust it and skip the title/artist text filter below for
+        // this tier: a real record logged under a nickname/abbreviation (e.g. "LP1" for
+        // American Football's eponymous debut) would otherwise have its exact catno match
+        // thrown out because the stored title doesn't textually resemble the official one.
+        const usedCatNoSearch = !!catalogueNumber && !isPlaceholderCatNo(catalogueNumber);
         let discogsQuery = "";
-        if (catalogueNumber && !isPlaceholderCatNo(catalogueNumber)) {
+        if (usedCatNoSearch) {
           discogsQuery = `https://api.discogs.com/database/search?catno=${encodeURIComponent(primaryCatNo(catalogueNumber))}&format=Vinyl&type=release`;
         } else if (matrixCode) {
           const q = [cleanArtist, cleanTitle, matrixCode].filter(Boolean).join(" ");
@@ -104,8 +111,8 @@ export const coverArt = onRequest(
               const img = r.cover_image || r.thumb;
               if (img && !img.includes("spacer.gif") && !results.includes(img)) {
                 const rTitle = (r.title || "").toLowerCase();
-                const matchesTitle = rTitle.includes(mainKeyword);
-                const matchesArtist = normalizedArtist ? normalizeArtistName(rTitle).includes(normalizedArtist) : true;
+                const matchesTitle = usedCatNoSearch || rTitle.includes(mainKeyword);
+                const matchesArtist = usedCatNoSearch || !normalizedArtist || normalizeArtistName(rTitle).includes(normalizedArtist);
                 if (matchesTitle && matchesArtist) {
                   results.push(img);
 
@@ -274,7 +281,8 @@ export const coverArt = onRequest(
       // shouldn't skip the only other tracklist source available).
       if (results.length < 2 || tracklist.length === 0) {
         try {
-          const mbq = catalogueNumber && !isPlaceholderCatNo(catalogueNumber)
+          const usedMbCatNoSearch = !!catalogueNumber && !isPlaceholderCatNo(catalogueNumber);
+          const mbq = usedMbCatNoSearch
             ? `catno:${primaryCatNo(catalogueNumber)}`
             : `release:"${cleanTitle}" AND artist:"${cleanArtist || 'Various Artists'}"`;
           const mbRes = await fetch(`https://musicbrainz.org/ws/2/release/?query=${encodeURIComponent(mbq)}&fmt=json`, {
@@ -283,7 +291,10 @@ export const coverArt = onRequest(
           if (mbRes.ok) {
             const mbJson: any = await mbRes.json();
             if (mbJson.releases && mbJson.releases.length > 0) {
-              const matched = mbJson.releases.filter((rel: any) => {
+              // Same reasoning as the Discogs tier: an exact catno-keyed query already
+              // proves the release is right, so don't let a nickname/abbreviated stored
+              // title reject it via the text filter.
+              const matched = usedMbCatNoSearch ? mbJson.releases : mbJson.releases.filter((rel: any) => {
                 const relTitle = (rel.title || "").toLowerCase();
                 const relArtist = (rel["artist-credit"]?.[0]?.name || "").toLowerCase();
                 const matchesTitle = relTitle.includes(mainKeyword) || mainKeyword.includes(relTitle);
