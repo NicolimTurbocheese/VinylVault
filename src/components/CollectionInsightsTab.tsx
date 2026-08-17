@@ -9,7 +9,8 @@ import {
   Library,
   Sparkles,
   ArrowUpRight,
-  ShieldCheck
+  ShieldCheck,
+  Disc3
 } from "lucide-react";
 import {
   BarChart,
@@ -266,11 +267,17 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
                 <span className="font-serif font-bold text-[#D4AF37] text-lg w-6 text-center">
                   #{index + 1}
                 </span>
-                <img
-                  src={item.coverArtUrl || "https://images.unsplash.com/photo-1619983081563-430f63602796?w=200"}
-                  alt={item.albumTitle}
-                  className="w-12 h-12 rounded object-cover border border-white/10 shadow"
-                />
+                {item.coverArtUrl ? (
+                  <img
+                    src={item.coverArtUrl}
+                    alt={item.albumTitle}
+                    className="w-12 h-12 rounded object-cover border border-white/10 shadow"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded bg-black/40 border border-white/10 shadow flex items-center justify-center flex-shrink-0">
+                    <Disc3 className="w-5 h-5 text-[#D4AF37]/50" />
+                  </div>
+                )}
                 <div className="min-w-0">
                   <h4 className="font-serif font-bold text-sm text-white truncate">{item.albumTitle}</h4>
                   <p className="text-xs font-serif text-[#D4AF37] truncate">{item.artist}</p>

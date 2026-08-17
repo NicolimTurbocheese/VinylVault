@@ -25,10 +25,8 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
   onImageChange,
   showRefreshOverlay = true,
 }) => {
-  const [currentUrl, setCurrentUrl] = useState<string>(
-    src || "https://images.unsplash.com/photo-1619983081563-430f63602796?w=300"
-  );
-  const [hasError, setHasError] = useState<boolean>(false);
+  const [currentUrl, setCurrentUrl] = useState<string>(src || "");
+  const [hasError, setHasError] = useState<boolean>(!src);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [candidateUrls, setCandidateUrls] = useState<string[]>([]);
   const [candidateIndex, setCandidateIndex] = useState<number>(0);
@@ -99,16 +97,16 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
           }
         }
 
-        // 3. Unsplash themed fallback
-        if (pool.length === 0) {
-          pool = [
-            `https://images.unsplash.com/photo-1619983081563-430f63602796?w=600&v=${Date.now()}`,
-            `https://images.unsplash.com/photo-1539375665275-f9de415ef9ac?w=600&v=${Date.now()}`,
-            `https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&v=${Date.now()}`,
-          ];
-        }
-
         setCandidateUrls(pool);
+      }
+
+      // No real match found anywhere — show the honest "no cover art" state
+      // rather than silently substituting an unrelated stock photo.
+      if (pool.length === 0) {
+        setHasError(true);
+        setStatusMessage("No match found");
+        setTimeout(() => setStatusMessage(null), 2000);
+        return;
       }
 
       // Find next candidate URL that is different from currentUrl
@@ -132,10 +130,8 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
       setTimeout(() => setStatusMessage(null), 2000);
     } catch (err) {
       console.warn("Error fetching alternative album artwork:", err);
-      const fallbackUrl = `https://images.unsplash.com/photo-1539375665275-f9de415ef9ac?w=600&v=${Date.now()}`;
-      setCurrentUrl(fallbackUrl);
-      setHasError(false);
-      if (onImageChange) onImageChange(fallbackUrl);
+      setStatusMessage("Search failed");
+      setTimeout(() => setStatusMessage(null), 2000);
     } finally {
       setIsLoading(false);
     }

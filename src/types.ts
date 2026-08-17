@@ -176,6 +176,12 @@ export interface ShelfItem extends RecordScanResult {
   // Which physical storage Box this record is filed in (Organise tab). Missing/unknown
   // box id means it falls into the virtual "Uncategorised" box.
   boxId?: string;
+  // Set when a record's data (typically grading) was defaulted/guessed rather than
+  // confirmed — e.g. during a bulk import where the source had a missing or
+  // non-standard grade. Surfaced as a "Needs Review" badge/filter so the owner can
+  // check the physical record and confirm or correct it.
+  needsReview?: boolean;
+  reviewNotes?: string;
 }
 
 // A user-defined physical storage location (e.g. "Crate 2", "Living Room Shelf A").

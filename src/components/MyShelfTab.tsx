@@ -20,12 +20,14 @@ import {
   Package,
   Grid3x3,
   Disc3,
-  Upload
+  Upload,
+  RefreshCw
 } from "lucide-react";
 import { ShelfItem, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { exportToCSV, exportToJSON } from "../utils/valuation";
 import { cleanFormatSpec } from "../utils/format";
 import { normalizeDiscogsGenre, DISCOGS_MACRO_GENRES } from "../utils/genre";
+import { apiUrl } from "../utils/apiBase";
 import { RecordCoverImage } from "./RecordCoverImage";
 import { CoverflowCarousel } from "./CoverflowCarousel";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
@@ -39,6 +41,7 @@ interface MyShelfTabProps {
   onDeleteItem: (id: string) => void;
   onGoToScan: () => void;
   onImportItems: (items: ShelfItem[]) => void;
+  onQuickUpdateItem: (item: ShelfItem) => void;
 }
 
 export const MyShelfTab: React.FC<MyShelfTabProps> = ({
@@ -48,10 +51,43 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   onDeleteItem,
   onGoToScan,
   onImportItems,
+  onQuickUpdateItem,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const importFileInputRef = React.useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [coverFetchProgress, setCoverFetchProgress] = useState<{ done: number; total: number; found: number } | null>(null);
+
+  const missingCoverItems = shelfItems.filter((i) => !i.coverArtUrl);
+
+  const handleBulkFetchCovers = async () => {
+    const targets = missingCoverItems;
+    if (targets.length === 0) return;
+    setCoverFetchProgress({ done: 0, total: targets.length, found: 0 });
+    let found = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const item = targets[i];
+      try {
+        const res = await fetch(
+          `${apiUrl("coverArt")}?artist=${encodeURIComponent(item.artist)}&albumTitle=${encodeURIComponent(
+            item.albumTitle
+          )}&catalogueNumber=${encodeURIComponent(item.catalogueNumber || "")}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const url = data.results?.[0];
+          if (url) {
+            onQuickUpdateItem({ ...item, coverArtUrl: url });
+            found++;
+          }
+        }
+      } catch (err) {
+        console.warn("Bulk cover fetch failed for", item.albumTitle, err);
+      }
+      setCoverFetchProgress({ done: i + 1, total: targets.length, found });
+    }
+    setTimeout(() => setCoverFetchProgress(null), 4000);
+  };
 
   const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -77,6 +113,8 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   };
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
+  const [needsReviewOnly, setNeedsReviewOnly] = useState(false);
+  const needsReviewCount = shelfItems.filter((i) => i.needsReview).length;
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [sortBy, setSortBy] = useState<"value-desc" | "value-asc" | "title" | "year" | "added">("value-desc");
   const [viewMode, setViewMode] = useState<"grid" | "coverflow">("grid");
@@ -146,6 +184,10 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   // Search & Filter items
   const filteredItems = shelfItems.filter((item) => {
     const norm = normalizeDiscogsGenre(item.genre, item.styles);
+
+    if (needsReviewOnly && !item.needsReview) {
+      return false;
+    }
 
     // Genre Filter check (multi-select, OR within genres)
     if (selectedGenres.length > 0 && !selectedGenres.includes(norm.genre)) {
@@ -266,9 +308,9 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
               <div className="text-xs font-sans text-[#6B655B] mt-2">No records added yet</div>
             )}
           </div>
-          {mostValuable ? (
+          {mostValuable && mostValuable.coverArtUrl ? (
             <img
-              src={mostValuable.coverArtUrl || "https://images.unsplash.com/photo-1619983081563-430f63602796?w=200"}
+              src={mostValuable.coverArtUrl}
               alt={mostValuable.albumTitle}
               className="w-12 h-12 rounded object-cover border border-[#E2DCD0] shadow-xs"
             />
@@ -296,11 +338,13 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                   title={`${item.albumTitle} — ${item.artist}`}
                   className="shrink-0 w-14 h-14 rounded-md overflow-hidden border border-[#E2DCD0] hover:border-[#A94A42]/50 shadow-xs transition cursor-pointer"
                 >
-                  <img
-                    src={item.coverArtUrl || "https://images.unsplash.com/photo-1619983081563-430f63602796?w=200"}
-                    alt={item.albumTitle}
-                    className="w-full h-full object-cover"
-                  />
+                  {item.coverArtUrl ? (
+                    <img src={item.coverArtUrl} alt={item.albumTitle} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-[#EFEAE0] flex items-center justify-center">
+                      <Disc3 className="w-5 h-5 text-[#A94A42]/50" />
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
@@ -337,6 +381,22 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
               Genre / Style{selectedGenres.length + selectedStyles.length > 0 ? ` (${selectedGenres.length + selectedStyles.length})` : ""}
             </span>
           </button>
+
+          {needsReviewCount > 0 && (
+            <button
+              onClick={() => setNeedsReviewOnly((prev) => !prev)}
+              className={`flex items-center gap-1.5 text-xs font-sans px-2.5 py-1.5 rounded-md border transition w-full sm:w-auto justify-center ${
+                needsReviewOnly
+                  ? "text-amber-700 bg-amber-100 border-amber-400 font-bold"
+                  : "text-amber-700 bg-amber-50 border-amber-300 hover:bg-amber-100"
+              }`}
+              title="Records where a grade or detail was defaulted rather than confirmed — worth checking against the physical record"
+            >
+              <span className="uppercase text-[10px] tracking-wider font-bold">
+                Needs Review ({needsReviewCount})
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Sort selector & Export Buttons */}
@@ -398,6 +458,21 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
               <Upload className="w-3.5 h-3.5 text-[#6B655B]" />
               <span>Import</span>
             </button>
+            {missingCoverItems.length > 0 && (
+              <button
+                onClick={handleBulkFetchCovers}
+                disabled={!!coverFetchProgress}
+                className="px-3 py-1.5 rounded-md bg-[#EFEAE0] text-[#2B2B2B] border border-[#D8D0C0] hover:bg-[#FAF8F3] text-xs font-sans font-bold uppercase tracking-wider flex items-center gap-1.5 transition disabled:opacity-60 cursor-pointer"
+                title="Fetch cover art for every record that's missing it, one after another"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-[#6B655B] ${coverFetchProgress ? "animate-spin" : ""}`} />
+                <span>
+                  {coverFetchProgress
+                    ? `Fetching Covers ${coverFetchProgress.done}/${coverFetchProgress.total}`
+                    : `Fetch ${missingCoverItems.length} Missing Cover${missingCoverItems.length === 1 ? "" : "s"}`}
+                </span>
+              </button>
+            )}
             <button
               onClick={() => exportToCSV(shelfItems)}
               disabled={shelfItems.length === 0}
@@ -422,6 +497,13 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
         {importError && (
           <div className="text-xs font-sans text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
             Import failed: {importError}
+          </div>
+        )}
+        {coverFetchProgress && coverFetchProgress.done === coverFetchProgress.total && (
+          <div className="text-xs font-sans text-[#6B655B] bg-[#EFEAE0] border border-[#D8D0C0] rounded-md px-3 py-2">
+            Found real cover art for {coverFetchProgress.found} of {coverFetchProgress.total} records. The rest genuinely
+            couldn't be matched (obscure/regional pressings) — those will show a "no cover art" placeholder instead of a
+            random unrelated photo.
           </div>
         )}
       </div>
@@ -554,13 +636,21 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                     artist={item.artist}
                     albumTitle={item.albumTitle}
                     catalogueNumber={item.catalogueNumber}
-                    onImageChange={(newUrl) => onEditItem({ ...item, coverArtUrl: newUrl })}
+                    onImageChange={(newUrl) => onQuickUpdateItem({ ...item, coverArtUrl: newUrl })}
                     className="w-20 h-20 rounded border border-[#E2DCD0] shadow-xs flex-shrink-0"
                     imgClassName="w-full h-full object-cover rounded group-hover:scale-105 transition"
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="text-[10px] font-sans font-medium text-[#6B655B] tracking-wider mb-0.5">
-                      {item.catalogueNumber || "Cat# Unlisted"}
+                    <div className="text-[10px] font-sans font-medium text-[#6B655B] tracking-wider mb-0.5 flex items-center gap-1.5">
+                      <span>{item.catalogueNumber || "Cat# Unlisted"}</span>
+                      {item.needsReview && (
+                        <span
+                          className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 text-[9px] font-bold uppercase tracking-wider"
+                          title={item.reviewNotes || "Needs review"}
+                        >
+                          Needs Review
+                        </span>
+                      )}
                     </div>
                     <h3 className="font-serif font-bold text-base text-[#2B2B2B] truncate">
                       {item.albumTitle}

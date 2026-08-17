@@ -482,6 +482,7 @@ export default function App() {
             onDeleteItem={handleDeleteItem}
             onGoToScan={() => setActiveTab("scan")}
             onImportItems={handleImportItems}
+            onQuickUpdateItem={(item) => handleSaveToShelf(item, { showFeedback: false })}
           />
         </div>
 
