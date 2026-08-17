@@ -1,8 +1,9 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { handlePreflight } from "./_lib/cors";
+import { discogsApiTokenSecret } from "./_lib/secrets";
 
 export const coverArt = onRequest(
-  { cors: false, timeoutSeconds: 30 },
+  { cors: false, timeoutSeconds: 30, secrets: [discogsApiTokenSecret] },
   async (req, res) => {
     if (handlePreflight(req, res)) return;
     if (req.method !== "GET") {
@@ -22,6 +23,11 @@ export const coverArt = onRequest(
       }
 
       const results: string[] = [];
+      const discogsToken = discogsApiTokenSecret.value();
+      const discogsHeaders: Record<string, string> = {
+        "User-Agent": "VinylVault/1.0 (+https://vinylvault.app)",
+        ...(discogsToken ? { Authorization: `Discogs token=${discogsToken}` } : {}),
+      };
 
       // Extract main album title (remove parenthetical subtitles like (The Original Soundtrack...))
       const cleanTitle = albumTitle.replace(/\s*\([^)]*\)/g, "").trim();
@@ -61,9 +67,7 @@ export const coverArt = onRequest(
           discogsQuery = `https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release`;
         }
 
-        const dRes = await fetch(discogsQuery, {
-          headers: { "User-Agent": "VinylVault/1.0 (+https://vinylvault.app)" }
-        });
+        const dRes = await fetch(discogsQuery, { headers: discogsHeaders });
         if (dRes.ok) {
           const dJson: any = await dRes.json();
           if (dJson.results && dJson.results.length > 0) {
@@ -75,6 +79,28 @@ export const coverArt = onRequest(
                 const matchesArtist = normalizedArtist ? normalizeArtistName(rTitle).includes(normalizedArtist) : true;
                 if (matchesTitle && matchesArtist) {
                   results.push(img);
+
+                  // With an authenticated token, pull the full release record for this
+                  // specific pressing — it carries every photo submitted for that exact
+                  // release (sleeve variants, obi, labels), not just the one search thumbnail.
+                  if (discogsToken && r.resource_url && results.length <= 1) {
+                    try {
+                      const relRes = await fetch(r.resource_url, { headers: discogsHeaders });
+                      if (relRes.ok) {
+                        const relJson: any = await relRes.json();
+                        const images: any[] = relJson?.images || [];
+                        for (const im of images) {
+                          const fullImg = im.uri || im.resource_url;
+                          if (fullImg && !results.includes(fullImg)) {
+                            results.push(fullImg);
+                          }
+                          if (results.length >= 4) break;
+                        }
+                      }
+                    } catch (relErr) {
+                      console.warn("Discogs release detail fetch error:", relErr);
+                    }
+                  }
                 }
               }
               if (results.length >= 4) break;
