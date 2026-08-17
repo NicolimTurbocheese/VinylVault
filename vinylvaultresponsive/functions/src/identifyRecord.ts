@@ -75,6 +75,7 @@ FINAL ESTIMATED MARKET VALUE METHODOLOGY (applies to baseMintValue.median):
 8. Only use FINAL, COMPLETED sale prices — the winning bid plus delivery/shipping charges. Never use active/current bids, "Buy It Now" asking prices, or unsold/relisted listings.
 9. Only include sale prices for this EXACT release (same artist, same album title, same pressing where identifiable). Discard any sold listing for a different record — including tribute albums, remixes, unrelated releases that merely share title words, or other titles by the same artist — even if it appeared in the search results.
 10. From the remaining verified completed-sale prices (each = winning bid + delivery), compute a 10% trimmed mean: discard the lowest 10% and highest 10% of the sorted price list, then average what remains. Use that trimmed mean as the "Final Estimated Market Value" (baseMintValue.median). Set baseMintValue.low and baseMintValue.high from the actual low/high of the untrimmed verified sale prices, not an arbitrary percentage spread.
+11. This app's users are in Singapore, buying and selling in a market where an ordinary secondhand pressing with no special rarity typically resells for roughly S$20-50 (comparable to Carousell / Roxy Records / Hear Records street pricing), not international "collector" asking prices. Ground the estimate in the verified completed-sale data you actually found rather than padding it upward, but don't artificially deflate it either — use the real trimmed mean. Reserve values above S$120 for pressings with an actual rarity signal you can point to in marketNotes (first pressing, deleted/rare title, notable artist, special edition, verified low print run) — a record being old or well-known is not on its own justification for a high price.
 
 Return ONLY a valid JSON object matching this exact schema:
 {
@@ -239,6 +240,15 @@ QUERY PARAMETERS:
         parsedData = discogsData;
       } else if (musicBrainzData) {
         parsedData = musicBrainzData;
+      } else if (imageBase64 && !catalogueNumber && !matrixCode && !barcode && !artistAlbum && !recordLabel) {
+        // Photo was the only input and AI vision identification came back empty (e.g. the
+        // Gemini API key isn't configured, or the call failed) — there is no text signal left
+        // to fall back on, so be honest that identification failed instead of fabricating a
+        // generic placeholder record and presenting it as a real match.
+        res.status(422).json({
+          error: "Couldn't identify this record from the photo alone. Try adding the catalogue number, matrix code (from the runout groove), or typing the artist/album name directly.",
+        });
+        return;
       } else {
         // Archival Fallback Generator
         const normCat = (catalogueNumber || "").toLowerCase().replace(/[^a-z0-9]/g, "");

@@ -450,6 +450,17 @@ export function calculateSmartDynamicValuation(data: {
 }): { low: number; median: number; high: number } {
   const extractedPrices: number[] = [];
 
+  // Currency conversion must be judged per-match, not against the whole source string —
+  // citations are routinely formatted like "S$125.00 (USD $92.00)" per the AI prompt's own
+  // example, and checking the whole string for "USD" would multiply the already-correct SGD
+  // figure by the USD rate too, inflating every such citation by ~35%.
+  const currencyMultiplierFor = (matchText: string): number => {
+    if (/GBP|£/i.test(matchText)) return 1.70;
+    if (/EUR|€/i.test(matchText)) return 1.45;
+    if (/USD/i.test(matchText) || (matchText.includes("$") && !matchText.includes("S$"))) return 1.35;
+    return 1; // S$ prefix, or no currency marker — already SGD
+  };
+
   if (data.ebayCitations && Array.isArray(data.ebayCitations)) {
     for (const cite of data.ebayCitations) {
       if (cite.price) {
@@ -458,16 +469,7 @@ export function calculateSmartDynamicValuation(data: {
           for (const m of matches) {
             const num = parseFloat(m.replace(/[^0-9.]/g, ""));
             if (!isNaN(num) && num > 10 && num < 2500) {
-              let sgdVal = num;
-              const pStr = String(cite.price);
-              if (pStr.includes("GBP") || pStr.includes("£")) {
-                sgdVal = num * 1.70;
-              } else if (pStr.includes("EUR") || pStr.includes("€")) {
-                sgdVal = num * 1.45;
-              } else if (pStr.includes("USD") || (pStr.includes("$") && !pStr.includes("S$"))) {
-                sgdVal = num * 1.35;
-              }
-              extractedPrices.push(sgdVal);
+              extractedPrices.push(num * currencyMultiplierFor(m));
             }
           }
         }
@@ -481,7 +483,7 @@ export function calculateSmartDynamicValuation(data: {
       for (const m of matches) {
         const num = parseFloat(m.replace(/[^0-9.]/g, ""));
         if (!isNaN(num) && num > 12 && num < 2500) {
-          extractedPrices.push(num * 1.35);
+          extractedPrices.push(num * currencyMultiplierFor(m));
         }
       }
     }
@@ -507,45 +509,52 @@ export function calculateSmartDynamicValuation(data: {
   const format = (data.format || "").toLowerCase();
   const label = (data.label || "").toLowerCase();
 
-  let baseMed = 65;
+  // Baseline for an ordinary, unremarkable secondhand pressing in the Singapore market —
+  // most common titles sell in roughly the S$15-40 range at local record stores (Roxy,
+  // Hear Records, etc.) and on Carousell, with real premiums reserved for genuine rarity
+  // signals (pre-1970 originals, Japanese/OBI pressings, box sets, notable artists), not
+  // just "it's a record." This intentionally starts low and lets the bonuses below do the
+  // work of pushing genuinely special pressings up, rather than starting high and treating
+  // every record as inherently valuable.
+  let baseMed = 42;
 
   if (!isNaN(year) && year > 1940) {
     if (year < 1970) {
-      baseMed += 65;
+      baseMed += 45;
     } else if (year < 1980) {
-      baseMed += 40;
+      baseMed += 25;
     } else if (year >= 1990 && year < 2005) {
-      baseMed += 75;
+      baseMed += 20;
     } else if (year >= 2005 && year < 2020) {
-      baseMed += 10;
+      baseMed += 5;
     }
   }
 
   if (country.includes("japan") || label.includes("toshiba") || label.includes("king") || label.includes("odeon") || format.includes("obi")) {
-    baseMed += 55;
+    baseMed += 35;
   } else if (country.includes("uk") || country.includes("united kingdom")) {
-    baseMed += 25;
+    baseMed += 15;
   }
 
   if (format.includes("box set")) {
-    baseMed += 90;
-  } else if (format.includes("limited") || format.includes("numbered") || format.includes("audiophile") || format.includes("half-speed") || format.includes("mfsl")) {
-    baseMed += 60;
+    baseMed += 55;
+  } else if (format.includes("limited") || format.includes("numbered") || format.includes("audiophile") || format.includes("half-speed") || format.includes("mfsl") || format.includes("180g") || format.includes("180 gram") || format.includes("200g") || format.includes("200 gram")) {
+    baseMed += 35;
   } else if (format.includes("gatefold") || format.includes("colored") || format.includes("picture disc")) {
-    baseMed += 20;
+    baseMed += 10;
   }
 
   const Tier1Artists = ["beatles", "pink floyd", "miles davis", "led zeppelin", "queen", "david bowie", "daft punk", "nirvana", "john coltrane", "michael jackson", "fleetwood mac", "taylor swift", "radiohead", "black sabbath", "velvet underground", "rolling stones", "bob dylan", "prince", "kate bush", "depeche mode", "joy division", "cure", "can", "kraftwerk"];
   if (Tier1Artists.some(a => artist.includes(a) || title.includes(a))) {
-    baseMed += 50;
+    baseMed += 25;
   }
 
   if (data.community && data.community.want && data.community.have) {
     const want = data.community.want;
     const have = data.community.have;
     const ratio = want / Math.max(1, have);
-    if (ratio > 3) baseMed *= 1.75;
-    else if (ratio > 1.5) baseMed *= 1.35;
+    if (ratio > 3) baseMed *= 1.5;
+    else if (ratio > 1.5) baseMed *= 1.2;
     else if (ratio < 0.3) baseMed *= 0.85;
   }
 
@@ -554,11 +563,11 @@ export function calculateSmartDynamicValuation(data: {
   for (let i = 0; i < str.length; i++) {
     seed = (seed * 31 + str.charCodeAt(i)) % 10007;
   }
-  const variance = (seed % 43) - 21;
-  baseMed = Math.max(28, Math.round(baseMed + variance));
+  const variance = (seed % 21) - 10;
+  baseMed = Math.max(15, Math.round(baseMed + variance));
 
-  const low = Math.max(18, Math.round(baseMed * 0.60));
-  const high = Math.round(baseMed * 1.75);
+  const low = Math.max(12, Math.round(baseMed * 0.62));
+  const high = Math.round(baseMed * 1.55);
 
   return { low, median: baseMed, high };
 }

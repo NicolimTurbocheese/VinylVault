@@ -357,11 +357,19 @@ input::placeholder, textarea::placeholder {
   background-color: #000000 !important;
 }
 
-/* Modals Overlay */
+/* Modals Overlay — every full-screen backdrop actually used in the app (AddToShelfModal,
+   CommandPalette, MyShelfTab/OrganiseTab delete confirmations, etc.) is fixed.inset-0 paired
+   with bg-black/50 or bg-black/60, not just /70 or /80. Without this exact match, the broad
+   ".bg-black/*" panel-background override further up repaints these backdrops into an opaque
+   theme surface color instead of leaving them as a translucent dimming layer, which makes a
+   modal look like it has no backdrop at all — especially on mobile, where the card itself is
+   full width and there's no visible margin to reveal the difference. */
 .bg-black\/80.backdrop-blur-md,
+.fixed.inset-0.bg-black\/50,
+.fixed.inset-0.bg-black\/60,
 .fixed.inset-0.bg-black\/70,
 .fixed.inset-0.bg-black\/80 {
-  background-color: rgba(0, 0, 0, 0.4) !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
   backdrop-filter: blur(6px) !important;
 }
 

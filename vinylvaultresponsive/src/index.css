@@ -357,11 +357,19 @@ input::placeholder, textarea::placeholder {
   background-color: #000000 !important;
 }
 
-/* Modals Overlay */
+/* Modals Overlay — every full-screen backdrop actually used in the app (AddToShelfModal,
+   CommandPalette, MyShelfTab/OrganiseTab delete confirmations, etc.) is fixed.inset-0 paired
+   with bg-black/50 or bg-black/60, not just /70 or /80. Without this exact match, the broad
+   ".bg-black/*" panel-background override further up repaints these backdrops into an opaque
+   theme surface color instead of leaving them as a translucent dimming layer, which makes a
+   modal look like it has no backdrop at all — especially on mobile, where the card itself is
+   full width and there's no visible margin to reveal the difference. */
 .bg-black\/80.backdrop-blur-md,
+.fixed.inset-0.bg-black\/50,
+.fixed.inset-0.bg-black\/60,
 .fixed.inset-0.bg-black\/70,
 .fixed.inset-0.bg-black\/80 {
-  background-color: rgba(0, 0, 0, 0.4) !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
   backdrop-filter: blur(6px) !important;
 }
 
@@ -438,4 +446,94 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton-shimmer { animation: none; }
+}
+
+/* Cursor-tracking spotlight glow — position set via --mx/--my custom properties on the
+   element itself (imperative, from onMouseMove), so it costs no React re-renders. */
+.spotlight-card {
+  position: relative;
+  isolation: isolate;
+}
+.spotlight-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: radial-gradient(
+    280px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(var(--vv-accent-rgb), 0.14),
+    transparent 70%
+  );
+}
+.spotlight-card:hover::before {
+  opacity: 1;
+}
+.spotlight-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight-card::before { display: none; }
+}
+
+/* Auto-scrolling ticker strip, pauses on hover so a specific cover can be inspected/clicked. */
+@keyframes marqueeScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  animation: marqueeScroll 28s linear infinite;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+}
+
+/* "Border beam" — a slow rotating gradient ring traced around a card's edge, used to
+   highlight a single hero metric without touching its background or text color. */
+@property --beam-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes borderBeamRotate {
+  to { --beam-angle: 360deg; }
+}
+
+.border-beam {
+  position: relative;
+}
+
+.border-beam::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--beam-angle),
+    transparent 0%,
+    var(--beam-color, rgba(var(--vv-accent-rgb), 0.9)) 12%,
+    transparent 28%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: borderBeamRotate 4.5s linear infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .border-beam::before { animation: none; }
 }

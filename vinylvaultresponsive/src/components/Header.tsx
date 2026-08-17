@@ -22,19 +22,19 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-[#F5F2EB]/95 backdrop-blur-md border-b border-[#E2DCD0]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20">
           {/* Logo & Title */}
           <div
             onClick={() => setActiveTab("scan")}
-            className="flex items-center gap-3 cursor-pointer group"
+            className="flex items-center gap-1.5 sm:gap-3 cursor-pointer group shrink-0"
           >
-            <div className="w-9 h-9 rounded-full border border-[#A94A42]/50 flex items-center justify-center bg-[#A94A42]/10 text-[#A94A42] shrink-0">
-              <Disc3 className="w-5 h-5 animate-spin-slow text-[#A94A42]" />
+            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full border border-[#A94A42]/50 flex items-center justify-center bg-[#A94A42]/10 text-[#A94A42] shrink-0">
+              <Disc3 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin-slow text-[#A94A42]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-2xl sm:text-3xl font-serif font-bold tracking-tight text-[#2B2B2B]">
+                <span className="text-base sm:text-3xl font-serif font-bold tracking-tight text-[#2B2B2B]">
                   VinylVault
                 </span>
               </div>
@@ -44,30 +44,35 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Navigation Tabs & Theme Switcher */}
-          <nav className="flex items-center gap-2 sm:gap-5 text-xs sm:text-sm font-medium font-sans">
+          {/* Navigation Tabs & Theme Switcher — icon-only below lg so the header never forces
+              the page wider than the viewport (verified: tablet width at 768px was exactly
+              where full labels used to switch on and no longer fit); full labels return once
+              there's room. */}
+          <nav className="flex items-center gap-0.5 sm:gap-2 lg:gap-5 text-xs sm:text-sm font-medium font-sans">
             <button
               onClick={() => setActiveTab("scan")}
-              className={`flex items-center gap-1.5 py-1.5 px-2.5 uppercase tracking-wider transition-all rounded-md ${
+              title="Scan / Search"
+              className={`flex items-center gap-1.5 py-1.5 px-1.5 lg:px-2.5 uppercase tracking-wider transition-all rounded-md ${
                 activeTab === "scan"
                   ? "text-[#A94A42] bg-[#A94A42]/10 border border-[#A94A42]/30 font-bold"
                   : "text-[#6B655B] border border-transparent hover:text-[#2B2B2B] hover:bg-[#E2DCD0]/30"
               }`}
             >
-              <Search className="w-3.5 h-3.5" />
-              <span>SCAN / SEARCH</span>
+              <Search className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden lg:inline">SCAN / SEARCH</span>
             </button>
 
             <button
               onClick={() => setActiveTab("shelf")}
-              className={`flex items-center gap-1.5 py-1.5 px-2.5 uppercase tracking-wider transition-all rounded-md relative ${
+              title="My Shelf"
+              className={`flex items-center gap-1.5 py-1.5 px-1.5 lg:px-2.5 uppercase tracking-wider transition-all rounded-md relative ${
                 activeTab === "shelf"
                   ? "text-[#A94A42] bg-[#A94A42]/10 border border-[#A94A42]/30 font-bold"
                   : "text-[#6B655B] border border-transparent hover:text-[#2B2B2B] hover:bg-[#E2DCD0]/30"
               }`}
             >
-              <Library className="w-3.5 h-3.5" />
-              <span>MY SHELF</span>
+              <Library className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden lg:inline">MY SHELF</span>
               {shelfCount > 0 && (
                 <span
                   className={`px-1.5 py-0.2 text-[9px] font-bold rounded-sm ${
@@ -83,45 +88,47 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               onClick={() => setActiveTab("insights")}
-              className={`flex items-center gap-1.5 py-1.5 px-2.5 uppercase tracking-wider transition-all rounded-md ${
+              title="Insights"
+              className={`flex items-center gap-1.5 py-1.5 px-1.5 lg:px-2.5 uppercase tracking-wider transition-all rounded-md ${
                 activeTab === "insights"
                   ? "text-[#A94A42] bg-[#A94A42]/10 border border-[#A94A42]/30 font-bold"
                   : "text-[#6B655B] border border-transparent hover:text-[#2B2B2B] hover:bg-[#E2DCD0]/30"
               }`}
             >
-              <BarChart3 className="w-3.5 h-3.5" />
-              <span>INSIGHTS</span>
+              <BarChart3 className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden lg:inline">INSIGHTS</span>
             </button>
 
             <button
               onClick={() => setActiveTab("organise")}
-              className={`flex items-center gap-1.5 py-1.5 px-2.5 uppercase tracking-wider transition-all rounded-md ${
+              title="Organise"
+              className={`flex items-center gap-1.5 py-1.5 px-1.5 lg:px-2.5 uppercase tracking-wider transition-all rounded-md ${
                 activeTab === "organise"
                   ? "text-[#A94A42] bg-[#A94A42]/10 border border-[#A94A42]/30 font-bold"
                   : "text-[#6B655B] border border-transparent hover:text-[#2B2B2B] hover:bg-[#E2DCD0]/30"
               }`}
             >
-              <Package className="w-3.5 h-3.5" />
-              <span>ORGANISE</span>
+              <Package className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden lg:inline">ORGANISE</span>
             </button>
 
             <button
               onClick={onOpenSync}
               title={isSyncing ? "Cross-device sync is on" : "Set up cross-device sync"}
-              className={`flex items-center gap-1.5 py-1.5 px-2.5 uppercase tracking-wider transition-all rounded-md border ${
+              className={`flex items-center gap-1.5 py-1.5 px-1.5 lg:px-2.5 uppercase tracking-wider transition-all rounded-md border ${
                 isSyncing
                   ? "text-[#2D4A3E] bg-[#8FA89B]/20 border-[#8FA89B]/50"
                   : "text-[#6B655B] border-transparent hover:text-[#2B2B2B] hover:bg-[#E2DCD0]/30"
               }`}
             >
-              {isSyncing ? <Cloud className="w-3.5 h-3.5" /> : <CloudOff className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">{isSyncing ? "SYNCED" : "SYNC"}</span>
+              {isSyncing ? <Cloud className="w-3.5 h-3.5 shrink-0" /> : <CloudOff className="w-3.5 h-3.5 shrink-0" />}
+              <span className="hidden lg:inline">{isSyncing ? "SYNCED" : "SYNC"}</span>
             </button>
 
             <button
               onClick={onOpenTheme}
               title="Change visual theme"
-              className="p-2 rounded-md text-[#6B655B] border border-transparent hover:text-[#A94A42] hover:bg-[#E2DCD0]/30 transition-all"
+              className="p-1.5 sm:p-2 rounded-md text-[#6B655B] border border-transparent hover:text-[#A94A42] hover:bg-[#E2DCD0]/30 transition-all"
             >
               <Palette className="w-3.5 h-3.5" />
             </button>
@@ -129,7 +136,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onOpenCommandPalette}
               title="Quick search & navigate"
-              className="hidden md:flex items-center gap-1.5 py-1.5 px-2.5 rounded-md border border-[#D8D0C0] text-[#6B655B] hover:text-[#2B2B2B] hover:border-[#A94A42]/40 bg-[#EFEAE0]/60 transition-all"
+              className="hidden lg:flex items-center gap-1.5 py-1.5 px-2.5 rounded-md border border-[#D8D0C0] text-[#6B655B] hover:text-[#2B2B2B] hover:border-[#A94A42]/40 bg-[#EFEAE0]/60 transition-all"
             >
               <Search className="w-3 h-3" />
               <kbd className="text-[10px] font-mono font-bold">⌘K</kbd>

@@ -1,0 +1,373 @@
+import React, { useRef, useState, useEffect, useCallback } from "react";
+import { ScanText, X, RefreshCw, Radio } from "lucide-react";
+import { useEscapeToClose } from "../hooks/useEscapeToClose";
+
+interface TextScanModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onUseText: (text: string, target: "catalogueNumber" | "matrixCode" | "barcode" | "artistAlbum") => void;
+}
+
+// How often to check whether the camera has gone still (cheap — a tiny downsampled frame diff).
+const STABILITY_CHECK_MS = 220;
+// Minimum time between actual OCR attempts, even while continuously stable.
+const OCR_COOLDOWN_MS = 700;
+// Consecutive stable checks required before triggering OCR early (≈ STABILITY_STREAK *
+// STABILITY_CHECK_MS of stillness). Loose on purpose — ordinary camera sensor noise/autofocus
+// jitter shows up as a real pixel difference even when the camera isn't moving, so requiring
+// near-zero diff meant "stillness" was rarely ever detected at all.
+const STABILITY_STREAK_REQUIRED = 1;
+const STABILITY_DIFF_THRESHOLD = 18;
+// Hard fallback: run OCR at least this often regardless of motion, so a noisy/low-light camera
+// that never reads as "stable" still gets attempts instead of going silent.
+const MAX_OCR_GAP_MS = 1800;
+
+// Runs OCR entirely in the browser (Tesseract.js, WebAssembly) — no server call, no API cost,
+// no Gemini quota involved. Continuously reads whatever text the camera is pointed at (like a
+// barcode scanner) instead of requiring a manual "capture" tap — hold the record steady over
+// printed text and it fills in on its own.
+export const TextScanModal: React.FC<TextScanModalProps> = ({ isOpen, onClose, onUseText }) => {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const stabilityCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const workerRef = useRef<any>(null);
+  const isProcessingRef = useRef(false);
+  const isEditingRef = useRef(false);
+  const prevFrameDataRef = useRef<Uint8ClampedArray | null>(null);
+  const stableStreakRef = useRef(0);
+  const lastOcrAtRef = useRef(0);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [recognizedText, setRecognizedText] = useState<string>("");
+
+  const handleClose = () => {
+    stopCamera();
+    setRecognizedText("");
+    isEditingRef.current = false;
+    setIsPaused(false);
+    onClose();
+  };
+
+  useEscapeToClose(isOpen, handleClose);
+
+  const startCamera = async (mode: "environment" | "user") => {
+    setErrorMsg(null);
+    stopCamera();
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+    } catch (err: any) {
+      console.error("Camera access error:", err);
+      setErrorMsg("Unable to access camera. Please check permissions and try again.");
+    }
+  };
+
+  const stopCamera = () => {
+    setStream((prev) => {
+      if (prev) prev.getTracks().forEach((track) => track.stop());
+      return null;
+    });
+  };
+
+  const toggleFacingMode = () => {
+    setFacingMode((prev) => (prev === "environment" ? "user" : "environment"));
+  };
+
+  const runScanPass = useCallback(async () => {
+    if (isProcessingRef.current || isEditingRef.current) return;
+    if (!videoRef.current || !canvasRef.current || !workerRef.current) return;
+    const video = videoRef.current;
+    if (!video.videoWidth) return;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+
+    isProcessingRef.current = true;
+    setIsScanning(true);
+    try {
+      const { data } = await workerRef.current.recognize(dataUrl);
+      const overallConfidence = (data as any).confidence ?? 0;
+
+      // The character whitelist keeps the OCR engine itself from guessing random symbols;
+      // this is a second pass of the same idea as a safety net on the raw text, plus an
+      // overall-confidence floor so a blurry/unreadable frame doesn't get shown at all.
+      const cleaned = (data.text || "")
+        .replace(/[^A-Za-z0-9 \-/.&,\n]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      // Require a reasonably solid read (not just a stray character) before replacing
+      // whatever's already on screen — keeps the last good result visible instead of
+      // flickering to a fragment on a weak frame.
+      if (cleaned && cleaned.length >= 3 && overallConfidence >= 45 && !isEditingRef.current) {
+        setRecognizedText(cleaned);
+      }
+    } catch (err) {
+      console.error("OCR error:", err);
+    } finally {
+      isProcessingRef.current = false;
+      setIsScanning(false);
+    }
+  }, []);
+
+  // Cheap motion check: downsample the current frame to a tiny canvas and compare it to the
+  // last check. Only once the camera has actually settled (a couple of consecutive stable
+  // checks) do we bother running the expensive OCR pass — this is what makes a brief moment
+  // of stillness enough, instead of needing to hold dead-still for however long a fixed
+  // capture interval happens to land on.
+  const checkStabilityAndMaybeScan = useCallback(() => {
+    if (isProcessingRef.current || isEditingRef.current) return;
+    if (!videoRef.current || !stabilityCanvasRef.current) return;
+    const video = videoRef.current;
+    if (!video.videoWidth) return;
+
+    const diffCanvas = stabilityCanvasRef.current;
+    diffCanvas.width = 48;
+    diffCanvas.height = 36;
+    const ctx = diffCanvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, 48, 36);
+    const frame = ctx.getImageData(0, 0, 48, 36).data;
+
+    const prev = prevFrameDataRef.current;
+    if (prev) {
+      let diff = 0;
+      for (let i = 0; i < frame.length; i += 4) {
+        diff += Math.abs(frame[i] - prev[i]);
+      }
+      const avgDiff = diff / (frame.length / 4);
+      if (avgDiff < STABILITY_DIFF_THRESHOLD) {
+        stableStreakRef.current += 1;
+      } else {
+        stableStreakRef.current = 0;
+      }
+    }
+    prevFrameDataRef.current = frame;
+
+    const now = Date.now();
+    const isStableEnough = stableStreakRef.current >= STABILITY_STREAK_REQUIRED;
+    const cooldownElapsed = now - lastOcrAtRef.current >= OCR_COOLDOWN_MS;
+    // Force an attempt periodically even without a confirmed "stable" read — protects against
+    // noisy/low-light cameras where the diff never reads as still enough on its own.
+    const fallbackDue = now - lastOcrAtRef.current >= MAX_OCR_GAP_MS;
+
+    if ((isStableEnough && cooldownElapsed) || fallbackDue) {
+      lastOcrAtRef.current = now;
+      runScanPass();
+    }
+  }, [runScanPass]);
+
+  // Camera lifecycle
+  useEffect(() => {
+    if (isOpen) {
+      setRecognizedText("");
+      isEditingRef.current = false;
+      setIsPaused(false);
+      prevFrameDataRef.current = null;
+      stableStreakRef.current = 0;
+      lastOcrAtRef.current = 0;
+      startCamera(facingMode);
+    } else {
+      stopCamera();
+    }
+    return () => {
+      stopCamera();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, facingMode]);
+
+  // Live-scan loop: create the OCR worker once and re-scan the current frame on an interval
+  // for as long as the modal is open, so nothing needs a manual capture tap.
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    let intervalId: number | null = null;
+
+    (async () => {
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("eng");
+      // Catalogue/matrix/barcode text is only ever letters, digits, and a handful of
+      // punctuation marks — restricting the character set stops Tesseract from guessing
+      // random symbols out of label artwork, scratches, or background noise.
+      await worker.setParameters({
+        tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 -/.&,",
+      });
+      if (cancelled) {
+        await worker.terminate();
+        return;
+      }
+      workerRef.current = worker;
+      intervalId = window.setInterval(checkStabilityAndMaybeScan, STABILITY_CHECK_MS);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (intervalId) window.clearInterval(intervalId);
+      if (workerRef.current) {
+        workerRef.current.terminate();
+        workerRef.current = null;
+      }
+    };
+  }, [isOpen, checkStabilityAndMaybeScan]);
+
+  const handleUse = (target: "catalogueNumber" | "matrixCode" | "barcode" | "artistAlbum") => {
+    if (!recognizedText) return;
+    onUseText(recognizedText, target);
+    handleClose();
+  };
+
+  const handleRestartScan = () => {
+    setRecognizedText("");
+    isEditingRef.current = false;
+    setIsPaused(false);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+      onClick={handleClose}
+    >
+      <div
+        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/60">
+          <div className="flex items-center gap-2 text-amber-400 font-semibold text-lg">
+            <ScanText className="w-5 h-5 text-amber-500" />
+            <span>Scan Catalogue / Matrix / Barcode Text</span>
+          </div>
+          <button
+            onClick={handleClose}
+            className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Video stream container */}
+        <div className="relative aspect-square sm:aspect-video w-full bg-black flex items-center justify-center overflow-hidden">
+          <button
+            onClick={handleClose}
+            title="Close (Esc)"
+            className="absolute top-3 right-3 z-10 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 backdrop-blur-sm transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
+          {errorMsg ? (
+            <div className="p-6 text-center text-zinc-400">
+              <p className="text-red-400 mb-2">{errorMsg}</p>
+            </div>
+          ) : (
+            <>
+              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+              {/* Text-alignment viewfinder — a wide rectangle, since printed codes read left-to-right */}
+              <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-amber-500/40 rounded-xl m-6 flex items-center justify-center">
+                <div className="w-[85%] h-14 rounded-md border border-amber-500/40 bg-amber-500/5" />
+              </div>
+
+              {/* Live scanning indicator */}
+              <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm">
+                <Radio className={`w-3 h-3 text-amber-400 ${isScanning ? "animate-pulse" : ""}`} />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                  {isPaused ? "Paused" : "Live Scanning"}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Recognized text + field assignment */}
+        {recognizedText && (
+          <div className="p-4 border-t border-zinc-800 bg-zinc-950/60 space-y-3 font-sans">
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-amber-400 font-bold mb-1 block">
+                Recognized Text — updating live, edit if needed
+              </label>
+              <textarea
+                value={recognizedText}
+                onChange={(e) => {
+                  isEditingRef.current = true;
+                  setIsPaused(true);
+                  setRecognizedText(e.target.value);
+                }}
+                onFocus={() => {
+                  isEditingRef.current = true;
+                  setIsPaused(true);
+                }}
+                rows={3}
+                className="w-full bg-zinc-900 border border-zinc-700 text-zinc-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-amber-500 transition resize-none"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => handleUse("catalogueNumber")}
+                className="px-3 py-2 text-xs font-bold rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-400 hover:bg-amber-500/20 transition"
+              >
+                Use as Catalogue Number
+              </button>
+              <button
+                onClick={() => handleUse("matrixCode")}
+                className="px-3 py-2 text-xs font-bold rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-400 hover:bg-amber-500/20 transition"
+              >
+                Use as Matrix Code
+              </button>
+              <button
+                onClick={() => handleUse("barcode")}
+                className="px-3 py-2 text-xs font-bold rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-400 hover:bg-amber-500/20 transition"
+              >
+                Use as Barcode
+              </button>
+              <button
+                onClick={() => handleUse("artistAlbum")}
+                className="px-3 py-2 text-xs font-bold rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-400 hover:bg-amber-500/20 transition"
+              >
+                Use as Artist / Album
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Controls */}
+        <div className="p-4 bg-zinc-950/80 border-t border-zinc-800 flex items-center justify-between">
+          <button
+            onClick={toggleFacingMode}
+            disabled={!!errorMsg}
+            className="px-3 py-2 text-xs font-medium text-zinc-300 hover:text-amber-400 bg-zinc-800 hover:bg-zinc-700 rounded-lg flex items-center gap-2 transition disabled:opacity-50"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Flip Camera</span>
+          </button>
+
+          {recognizedText && (
+            <button
+              onClick={handleRestartScan}
+              className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-300 hover:text-amber-400 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition"
+            >
+              Resume Live Scan
+            </button>
+          )}
+        </div>
+
+        <canvas ref={canvasRef} className="hidden" />
+        <canvas ref={stabilityCanvasRef} className="hidden" />
+      </div>
+    </div>
+  );
+};

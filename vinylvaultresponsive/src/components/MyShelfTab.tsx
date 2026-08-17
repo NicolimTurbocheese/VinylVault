@@ -17,13 +17,16 @@ import {
   Calendar,
   Layers,
   ArrowLeft,
-  Package
+  Package,
+  Grid3x3,
+  Disc3
 } from "lucide-react";
 import { ShelfItem, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { exportToCSV, exportToJSON } from "../utils/valuation";
 import { cleanFormatSpec } from "../utils/format";
 import { normalizeDiscogsGenre, DISCOGS_MACRO_GENRES } from "../utils/genre";
 import { RecordCoverImage } from "./RecordCoverImage";
+import { CoverflowCarousel } from "./CoverflowCarousel";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import { useCountUp } from "../hooks/useCountUp";
 
@@ -47,9 +50,14 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [sortBy, setSortBy] = useState<"value-desc" | "value-asc" | "title" | "year" | "added">("value-desc");
+  const [viewMode, setViewMode] = useState<"grid" | "coverflow">("grid");
   const [itemToDelete, setItemToDelete] = useState<ShelfItem | null>(null);
 
   useEscapeToClose(!!itemToDelete, () => setItemToDelete(null));
+
+  const recentlyAdded = [...shelfItems]
+    .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime())
+    .slice(0, 10);
 
   const toggleGenre = (genre: string) => {
     setSelectedGenres((prev) =>
@@ -157,14 +165,14 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   return (
     <div className="space-y-8 pb-12">
       {/* Top Header Back Navigation */}
-      <div className="flex items-center justify-between gap-4 pb-2 border-b border-[#E2DCD0]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-2 border-b border-[#E2DCD0]">
         <div>
           <h2 className="text-2xl font-serif font-bold text-[#2B2B2B]">My Vinyl Shelf</h2>
           <p className="text-xs font-sans text-[#6B655B]">Organize, filter, and track your archived vinyl collection</p>
         </div>
         <button
           onClick={onGoToScan}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-[#A94A42] text-white hover:bg-[#8E3E37] text-xs font-bold font-sans uppercase tracking-wider transition shadow-sm cursor-pointer shrink-0"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-[#A94A42] text-white hover:bg-[#8E3E37] text-xs font-bold font-sans uppercase tracking-wider transition shadow-sm cursor-pointer shrink-0 w-full sm:w-auto"
         >
           <ArrowLeft className="w-4 h-4 text-white" />
           <span>Back to Scanner & Search</span>
@@ -242,6 +250,34 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
         </div>
       </div>
 
+      {/* Recently Added Ticker */}
+      {shelfItems.length > 1 && (
+        <div className="rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] shadow-sm overflow-hidden py-3">
+          <span className="block px-4 pb-2 text-[10px] font-sans font-bold uppercase tracking-wider text-[#6B655B]">
+            Recently Added
+          </span>
+          <div className="overflow-hidden">
+            <div className="marquee-track flex items-center gap-3 w-max">
+              {[...recentlyAdded, ...recentlyAdded].map((item, i) => (
+                <button
+                  key={`${item.id}-${i}`}
+                  type="button"
+                  onClick={() => onEditItem(item)}
+                  title={`${item.albumTitle} — ${item.artist}`}
+                  className="shrink-0 w-14 h-14 rounded-md overflow-hidden border border-[#E2DCD0] hover:border-[#A94A42]/50 shadow-xs transition cursor-pointer"
+                >
+                  <img
+                    src={item.coverArtUrl || "https://images.unsplash.com/photo-1619983081563-430f63602796?w=200"}
+                    alt={item.albumTitle}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Control Bar & Export Actions */}
       <div className="p-4 rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] shadow-sm flex flex-col lg:flex-row items-center justify-between gap-4">
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
@@ -275,6 +311,30 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
 
         {/* Sort selector & Export Buttons */}
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end font-sans">
+          {/* Grid / Coverflow View Toggle */}
+          <div className="flex items-center rounded-md border border-[#D8D0C0] overflow-hidden">
+            <button
+              onClick={() => setViewMode("grid")}
+              title="Grid view"
+              className={`px-2.5 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition ${
+                viewMode === "grid" ? "bg-[#A94A42] text-white" : "bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40"
+              }`}
+            >
+              <Grid3x3 className="w-3.5 h-3.5" />
+              <span>Grid</span>
+            </button>
+            <button
+              onClick={() => setViewMode("coverflow")}
+              title="Coverflow view"
+              className={`px-2.5 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition ${
+                viewMode === "coverflow" ? "bg-[#A94A42] text-white" : "bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40"
+              }`}
+            >
+              <Disc3 className="w-3.5 h-3.5" />
+              <span>Coverflow</span>
+            </button>
+          </div>
+
           <div className="flex items-center gap-1.5 text-xs text-[#6B655B]">
             <ArrowUpDown className="w-3.5 h-3.5 text-[#A94A42]" />
             <span className="uppercase text-[10px] tracking-wider font-bold">Sort:</span>
@@ -407,13 +467,21 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
         </div>
       )}
 
+      {/* Coverflow Browser */}
+      {viewMode === "coverflow" && sortedItems.length > 0 && (
+        <div className="p-4 sm:p-6 rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] shadow-sm">
+          <CoverflowCarousel items={sortedItems} onSelectItem={onEditItem} />
+        </div>
+      )}
+
       {/* Collection Grid View */}
       {sortedItems.length > 0 ? (
+        viewMode === "grid" && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sortedItems.map((item) => (
             <div
               key={item.id}
-              className="rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] hover:border-[#A94A42]/40 p-5 shadow-sm hover:shadow-lg transition flex flex-col justify-between group [transform-style:preserve-3d] will-change-transform"
+              className="spotlight-card rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] hover:border-[#A94A42]/40 p-5 shadow-sm hover:shadow-lg transition flex flex-col justify-between group [transform-style:preserve-3d] will-change-transform"
               onMouseMove={(e) => {
                 if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
                 const card = e.currentTarget;
@@ -421,6 +489,8 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                 const px = (e.clientX - rect.left) / rect.width - 0.5;
                 const py = (e.clientY - rect.top) / rect.height - 0.5;
                 card.style.transform = `perspective(900px) rotateX(${(-py * 6).toFixed(2)}deg) rotateY(${(px * 6).toFixed(2)}deg) translateY(-3px)`;
+                card.style.setProperty("--mx", `${((px + 0.5) * 100).toFixed(1)}%`);
+                card.style.setProperty("--my", `${((py + 0.5) * 100).toFixed(1)}%`);
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "";
@@ -573,6 +643,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             </div>
           ))}
         </div>
+        )
       ) : (
         /* Empty State */
         <div className="p-12 text-center rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] max-w-lg mx-auto space-y-4 shadow-sm">

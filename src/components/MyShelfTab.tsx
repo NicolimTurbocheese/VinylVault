@@ -165,14 +165,14 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   return (
     <div className="space-y-8 pb-12">
       {/* Top Header Back Navigation */}
-      <div className="flex items-center justify-between gap-4 pb-2 border-b border-[#E2DCD0]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-2 border-b border-[#E2DCD0]">
         <div>
           <h2 className="text-2xl font-serif font-bold text-[#2B2B2B]">My Vinyl Shelf</h2>
           <p className="text-xs font-sans text-[#6B655B]">Organize, filter, and track your archived vinyl collection</p>
         </div>
         <button
           onClick={onGoToScan}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-[#A94A42] text-white hover:bg-[#8E3E37] text-xs font-bold font-sans uppercase tracking-wider transition shadow-sm cursor-pointer shrink-0"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-md bg-[#A94A42] text-white hover:bg-[#8E3E37] text-xs font-bold font-sans uppercase tracking-wider transition shadow-sm cursor-pointer shrink-0 w-full sm:w-auto"
         >
           <ArrowLeft className="w-4 h-4 text-white" />
           <span>Back to Scanner & Search</span>

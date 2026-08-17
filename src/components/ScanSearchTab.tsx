@@ -580,12 +580,12 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end font-sans">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full sm:w-auto justify-end font-sans">
               <button
                 type="button"
                 onClick={() => setIsTextScanOpen(true)}
                 title="Point the camera at printed text and read it automatically — no typing, no AI cost"
-                className="flex-1 sm:flex-initial px-4 py-2.5 rounded-md text-xs font-bold uppercase tracking-wider bg-[#2D4A3E] text-white hover:bg-[#25392F] transition flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                className="w-full sm:w-auto sm:flex-initial px-4 py-2.5 rounded-md text-xs font-bold uppercase tracking-wider bg-[#2D4A3E] text-white hover:bg-[#25392F] transition flex items-center justify-center gap-2 shadow-sm cursor-pointer"
               >
                 <ScanText className="w-3.5 h-3.5 text-white" />
                 <span>Scan Text</span>
@@ -594,13 +594,13 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
               <button
                 type="button"
                 onClick={() => setIsCameraOpen(true)}
-                className="flex-1 sm:flex-initial px-4 py-2.5 rounded-md text-xs font-bold uppercase tracking-wider bg-[#A94A42] text-white hover:bg-[#8E3E37] transition flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                className="w-full sm:w-auto sm:flex-initial px-4 py-2.5 rounded-md text-xs font-bold uppercase tracking-wider bg-[#A94A42] text-white hover:bg-[#8E3E37] transition flex items-center justify-center gap-2 shadow-sm cursor-pointer"
               >
                 <Camera className="w-3.5 h-3.5 text-white" />
                 <span>Live Camera</span>
               </button>
 
-              <label className="flex-1 sm:flex-initial px-4 py-2.5 rounded-md text-xs font-bold uppercase tracking-wider bg-[#A94A42] text-white hover:bg-[#8E3E37] flex items-center justify-center gap-2 cursor-pointer transition shadow-sm">
+              <label className="w-full sm:w-auto sm:flex-initial px-4 py-2.5 rounded-md text-xs font-bold uppercase tracking-wider bg-[#A94A42] text-white hover:bg-[#8E3E37] flex items-center justify-center gap-2 cursor-pointer transition shadow-sm">
                 <Upload className="w-3.5 h-3.5 text-white" />
                 <span>Choose File</span>
                 <input
