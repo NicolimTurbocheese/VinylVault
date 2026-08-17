@@ -122,21 +122,38 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
   const COLORS = ["#D4AF37", "#FFBF00", "#997A15", "#B38F24", "#66520E", "#E5C158"];
 
   // 5. Collection value over time — a running total of estimated value as records were
-  // acquired, sorted by "Added" date. This tracks how the collection's value grew as it
-  // was built (acquisition order), not fluctuations in an already-owned item's market
-  // price over time — the app doesn't take periodic re-valuation snapshots, so a true
-  // "market price history" chart isn't something honest data supports yet.
-  const valueOverTimeData = [...shelfItems]
-    .filter((i) => i.addedAt)
-    .sort((a, b) => new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime())
-    .reduce<{ date: string; value: number }[]>((acc, item) => {
-      const prevValue = acc.length > 0 ? acc[acc.length - 1].value : 0;
-      acc.push({
-        date: new Date(item.addedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" }),
-        value: prevValue + (item.calculatedValue?.median || 0),
+  // acquired. Prefer the real purchase date over "Added" date: a bulk import (or any
+  // batch entry) gives many records the same addedAt timestamp, which collapses the
+  // whole batch into one vertical jump instead of a real timeline. Items missing a
+  // purchaseDate fall back to addedAt. Same-day entries are merged into a single point
+  // so the axis doesn't fill up with stacked duplicate dates. This tracks how the
+  // collection's value grew as it was built (acquisition order), not fluctuations in an
+  // already-owned item's market price over time — the app doesn't take periodic
+  // re-valuation snapshots, so a true "market price history" chart isn't something
+  // honest data supports yet.
+  const valueOverTimeData = (() => {
+    const dated = shelfItems
+      .map((item) => ({ item, dateStr: item.purchaseDate || item.addedAt }))
+      .filter((x): x is { item: ShelfItem; dateStr: string } => !!x.dateStr && !isNaN(new Date(x.dateStr).getTime()))
+      .sort((a, b) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime());
+
+    const byDay = new Map<string, number>();
+    for (const { item, dateStr } of dated) {
+      const dayKey = new Date(dateStr).toISOString().slice(0, 10);
+      byDay.set(dayKey, (byDay.get(dayKey) || 0) + (item.calculatedValue?.median || 0));
+    }
+
+    let running = 0;
+    return Array.from(byDay.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([dayKey, dayValue]) => {
+        running += dayValue;
+        return {
+          date: new Date(dayKey).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" }),
+          value: running,
+        };
       });
-      return acc;
-    }, []);
+  })();
 
   // 5. Top 5 Most Valuable
   const topValuable = [...shelfItems]

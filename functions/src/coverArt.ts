@@ -156,6 +156,36 @@ export const coverArt = onRequest(
                 if (!results.includes(highResArt)) {
                   results.push(highResArt);
                 }
+
+                // iTunes' lookup endpoint returns every track on a collection given its
+                // ID, at no extra auth cost — a free tracklist source distinct from
+                // Discogs/MusicBrainz that meaningfully widens coverage.
+                if (tracklist.length === 0 && item.collectionId) {
+                  try {
+                    const lookupRes = await fetch(
+                      `https://itunes.apple.com/lookup?id=${item.collectionId}&entity=song&limit=200`
+                    );
+                    if (lookupRes.ok) {
+                      const lookupJson: any = await lookupRes.json();
+                      const tracks: any[] = (lookupJson?.results || []).filter((r: any) => r.wrapperType === "track");
+                      if (tracks.length > 0) {
+                        tracklist = tracks.map((t, idx) => {
+                          const durMs = t.trackTimeMillis;
+                          const durStr = durMs
+                            ? `${Math.floor(durMs / 60000)}:${String(Math.floor((durMs % 60000) / 1000)).padStart(2, "0")}`
+                            : undefined;
+                          return {
+                            position: String(t.trackNumber || idx + 1),
+                            title: t.trackName || `Track ${idx + 1}`,
+                            duration: durStr,
+                          };
+                        });
+                      }
+                    }
+                  } catch (lookupErr) {
+                    console.warn("iTunes tracklist lookup error:", lookupErr);
+                  }
+                }
               }
             }
           }
@@ -166,8 +196,10 @@ export const coverArt = onRequest(
 
       // 3. Deezer search — another large commercial catalogue, no API key required for
       // read/search endpoints, and it indexes a different mix of regional/reissue
-      // pressings than iTunes does.
-      if (results.length < 2) {
+      // pressings than iTunes does. Also runs whenever tracklist is still empty (not
+      // only when cover art is still insufficient), since Deezer's per-album tracks
+      // endpoint is another free tracklist source.
+      if (results.length < 2 || tracklist.length === 0) {
         try {
           const deezerQuery = [cleanArtist, cleanTitle].filter(Boolean).join(" ") || cleanTitle;
           const dzRes = await fetch(`https://api.deezer.com/search/album?q=${encodeURIComponent(deezerQuery)}&limit=5`);
@@ -181,10 +213,37 @@ export const coverArt = onRequest(
               const itemArtist = (item.artist?.name || "").toLowerCase();
               const matchesTitle = itemTitle.includes(mainKeyword) || mainKeyword.includes(itemTitle);
               const matchesArtist = normalizedArtist ? normalizeArtistName(itemArtist).includes(normalizedArtist) : true;
-              if (matchesTitle && matchesArtist && !results.includes(img)) {
-                results.push(img);
+              if (matchesTitle && matchesArtist) {
+                if (!results.includes(img)) {
+                  results.push(img);
+                }
+
+                if (tracklist.length === 0 && item.id) {
+                  try {
+                    const dzTracksRes = await fetch(`https://api.deezer.com/album/${item.id}/tracks`);
+                    if (dzTracksRes.ok) {
+                      const dzTracksJson: any = await dzTracksRes.json();
+                      const dzTracks: any[] = dzTracksJson?.data || [];
+                      if (dzTracks.length > 0) {
+                        tracklist = dzTracks.map((t, idx) => {
+                          const durSec = t.duration;
+                          const durStr = durSec
+                            ? `${Math.floor(durSec / 60)}:${String(durSec % 60).padStart(2, "0")}`
+                            : undefined;
+                          return {
+                            position: String(t.track_position || idx + 1),
+                            title: t.title || `Track ${idx + 1}`,
+                            duration: durStr,
+                          };
+                        });
+                      }
+                    }
+                  } catch (dzTrackErr) {
+                    console.warn("Deezer tracklist fetch error:", dzTrackErr);
+                  }
+                }
               }
-              if (results.length >= 2) break;
+              if (results.length >= 2 && tracklist.length > 0) break;
             }
           }
         } catch (err) {
