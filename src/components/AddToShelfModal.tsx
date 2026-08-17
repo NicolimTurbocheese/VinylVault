@@ -182,11 +182,11 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto animate-fade-in"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 py-8 overflow-y-auto animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg my-8 rounded-xl bg-[#FAF8F3] border border-[#E2DCD0] shadow-2xl overflow-hidden"
+        className="relative w-full max-w-lg rounded-xl bg-[#FAF8F3] border border-[#E2DCD0] shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
