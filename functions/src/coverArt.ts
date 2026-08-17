@@ -37,10 +37,16 @@ export const coverArt = onRequest(
         s.toLowerCase().replace(/,\s*the\b/gi, "").replace(/\bthe\s+/gi, "").trim();
       const normalizedArtist = cleanArtist ? normalizeArtistName(cleanArtist) : "";
 
+      // Placeholder text collectors use in the catalogue-number field when only a barcode
+      // (or nothing) was legible — never a real catalogue number, so never usable as a
+      // Discogs catno search term (searching catno="Barcode" returns garbage/no matches).
+      const isPlaceholderCatNo = (v: string) =>
+        !v || ["cat-no", "n/a", "barcode", "unknown", "none", "-", "tbd"].includes(v.trim().toLowerCase());
+
       // 1. Query Discogs API by Catalogue Number or Clean Title
       try {
         let discogsQuery = "";
-        if (catalogueNumber && catalogueNumber !== "CAT-NO" && catalogueNumber !== "N/A") {
+        if (catalogueNumber && !isPlaceholderCatNo(catalogueNumber)) {
           discogsQuery = `https://api.discogs.com/database/search?catno=${encodeURIComponent(catalogueNumber)}&type=release`;
         } else {
           const q = [cleanArtist, cleanTitle].filter(Boolean).join(" ");
@@ -103,7 +109,7 @@ export const coverArt = onRequest(
       // 3. Fallback to MusicBrainz / CoverArtArchive
       if (results.length < 2) {
         try {
-          const mbq = catalogueNumber && catalogueNumber !== "CAT-NO"
+          const mbq = catalogueNumber && !isPlaceholderCatNo(catalogueNumber)
             ? `catno:${catalogueNumber}`
             : `release:"${cleanTitle}" AND artist:"${cleanArtist || 'Various Artists'}"`;
           const mbRes = await fetch(`https://musicbrainz.org/ws/2/release/?query=${encodeURIComponent(mbq)}&fmt=json`, {
