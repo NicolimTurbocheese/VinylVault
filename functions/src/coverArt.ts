@@ -114,7 +114,35 @@ export const coverArt = onRequest(
         console.warn("iTunes cover art search error:", err);
       }
 
-      // 3. Fallback to MusicBrainz / CoverArtArchive
+      // 3. Deezer search — another large commercial catalogue, no API key required for
+      // read/search endpoints, and it indexes a different mix of regional/reissue
+      // pressings than iTunes does.
+      if (results.length < 2) {
+        try {
+          const deezerQuery = [cleanArtist, cleanTitle].filter(Boolean).join(" ") || cleanTitle;
+          const dzRes = await fetch(`https://api.deezer.com/search/album?q=${encodeURIComponent(deezerQuery)}&limit=5`);
+          if (dzRes.ok) {
+            const dzJson: any = await dzRes.json();
+            const items: any[] = dzJson?.data || [];
+            for (const item of items) {
+              const img = item.cover_big || item.cover_medium || item.cover;
+              if (!img) continue;
+              const itemTitle = (item.title || "").toLowerCase();
+              const itemArtist = (item.artist?.name || "").toLowerCase();
+              const matchesTitle = itemTitle.includes(mainKeyword) || mainKeyword.includes(itemTitle);
+              const matchesArtist = normalizedArtist ? normalizeArtistName(itemArtist).includes(normalizedArtist) : true;
+              if (matchesTitle && matchesArtist && !results.includes(img)) {
+                results.push(img);
+              }
+              if (results.length >= 2) break;
+            }
+          }
+        } catch (err) {
+          console.warn("Deezer cover art search error:", err);
+        }
+      }
+
+      // 4. Fallback to MusicBrainz / CoverArtArchive
       if (results.length < 2) {
         try {
           const mbq = catalogueNumber && !isPlaceholderCatNo(catalogueNumber)
@@ -143,6 +171,79 @@ export const coverArt = onRequest(
           }
         } catch (err) {
           console.warn("MusicBrainz cover art search error:", err);
+        }
+      }
+
+      // 5. Wikipedia search fallback — catches well-known albums (especially classical,
+      // jazz, and older catalogue titles) that Discogs/iTunes/MusicBrainz miss, without
+      // needing a paid image-search API. Searches Wikipedia for the article, then pulls
+      // its lead image via the pageimages API — usually the album cover for music articles.
+      if (results.length === 0) {
+        try {
+          const searchTerm = [cleanArtist, cleanTitle].filter(Boolean).join(" ") || cleanTitle;
+          const searchRes = await fetch(
+            `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+              searchTerm + " album"
+            )}&format=json&srlimit=3`,
+            { headers: { "User-Agent": "VinylVault/1.0 (contact@vinylvault.app)" } }
+          );
+          if (searchRes.ok) {
+            const searchJson: any = await searchRes.json();
+            const hits: any[] = searchJson?.query?.search || [];
+            for (const hit of hits) {
+              const hitTitle = String(hit.title || "").toLowerCase();
+              // Loose relevance check: don't pull an image for a clearly unrelated article
+              if (!hitTitle.includes(mainKeyword.split(" ")[0] || "")) continue;
+
+              const imgRes = await fetch(
+                `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
+                  hit.title
+                )}&prop=pageimages&format=json&pithumbsize=500`,
+                { headers: { "User-Agent": "VinylVault/1.0 (contact@vinylvault.app)" } }
+              );
+              if (imgRes.ok) {
+                const imgJson: any = await imgRes.json();
+                const pages = imgJson?.query?.pages || {};
+                for (const pageId of Object.keys(pages)) {
+                  const thumb = pages[pageId]?.thumbnail?.source;
+                  if (thumb && !results.includes(thumb)) {
+                    results.push(thumb);
+                  }
+                }
+              }
+              if (results.length >= 2) break;
+            }
+          }
+        } catch (err) {
+          console.warn("Wikipedia cover art search error:", err);
+        }
+      }
+
+      // 6. TheAudioDB — free community-run music database, useful for regional/reissue
+      // pressings that the bigger commercial catalogues don't carry. "2" is TheAudioDB's
+      // own published free test key for exactly this kind of low-volume public use
+      // (documented on their site, not a private credential).
+      if (results.length === 0) {
+        try {
+          const adbRes = await fetch(
+            `https://theaudiodb.com/api/v1/json/2/searchalbum.php?s=${encodeURIComponent(cleanArtist || artist)}&a=${encodeURIComponent(cleanTitle)}`
+          );
+          if (adbRes.ok) {
+            const adbJson: any = await adbRes.json();
+            const albums: any[] = adbJson?.album || [];
+            for (const album of albums) {
+              const img = album.strAlbumThumb || album.strAlbumThumbHQ;
+              if (!img) continue;
+              const albumTitleLower = (album.strAlbum || "").toLowerCase();
+              const matchesTitle = albumTitleLower.includes(mainKeyword) || mainKeyword.includes(albumTitleLower);
+              if (matchesTitle && !results.includes(img)) {
+                results.push(img);
+              }
+              if (results.length >= 2) break;
+            }
+          }
+        } catch (err) {
+          console.warn("TheAudioDB cover art search error:", err);
         }
       }
 
