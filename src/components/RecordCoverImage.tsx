@@ -7,6 +7,7 @@ interface RecordCoverImageProps {
   artist: string;
   albumTitle: string;
   catalogueNumber?: string;
+  matrixCode?: string;
   className?: string;
   imgClassName?: string;
   alt?: string;
@@ -19,6 +20,7 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
   artist,
   albumTitle,
   catalogueNumber,
+  matrixCode,
   className = "w-20 h-20 rounded object-cover border border-[#E2DCD0] shadow-xs flex-shrink-0 relative group/cover",
   imgClassName = "w-full h-full object-cover rounded",
   alt,
@@ -54,7 +56,7 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
           const apiRes = await fetch(
             `${apiUrl("coverArt")}?artist=${encodeURIComponent(artist)}&albumTitle=${encodeURIComponent(
               albumTitle
-            )}&catalogueNumber=${encodeURIComponent(catalogueNumber || "")}`
+            )}&catalogueNumber=${encodeURIComponent(catalogueNumber || "")}&matrixCode=${encodeURIComponent(matrixCode || "")}`
           );
           if (apiRes.ok) {
             const apiData = await apiRes.json();

@@ -14,6 +14,7 @@ export const coverArt = onRequest(
       const artist = String(req.query.artist || "").trim();
       const albumTitle = String(req.query.albumTitle || "").trim();
       const catalogueNumber = String(req.query.catalogueNumber || "").trim();
+      const matrixCode = String(req.query.matrixCode || "").trim();
 
       if (!albumTitle) {
         res.status(400).json({ error: "albumTitle parameter required" });
@@ -43,11 +44,18 @@ export const coverArt = onRequest(
       const isPlaceholderCatNo = (v: string) =>
         !v || ["cat-no", "n/a", "barcode", "unknown", "none", "-", "tbd"].includes(v.trim().toLowerCase());
 
-      // 1. Query Discogs API by Catalogue Number or Clean Title
+      // 1. Query Discogs API by Catalogue Number, Matrix/Runout Code, or Clean Title.
+      // Catalogue number is the strongest signal (Discogs' catno= field is indexed
+      // directly); the matrix/runout code isn't a dedicated search field on Discogs, so
+      // it's folded into the free-text query as the next-best pressing-specific signal
+      // when there's no usable catalogue number.
       try {
         let discogsQuery = "";
         if (catalogueNumber && !isPlaceholderCatNo(catalogueNumber)) {
           discogsQuery = `https://api.discogs.com/database/search?catno=${encodeURIComponent(catalogueNumber)}&type=release`;
+        } else if (matrixCode) {
+          const q = [cleanArtist, cleanTitle, matrixCode].filter(Boolean).join(" ");
+          discogsQuery = `https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release`;
         } else {
           const q = [cleanArtist, cleanTitle].filter(Boolean).join(" ");
           discogsQuery = `https://api.discogs.com/database/search?q=${encodeURIComponent(q)}&type=release`;

@@ -42,6 +42,7 @@ interface MyShelfTabProps {
   onGoToScan: () => void;
   onImportItems: (items: ShelfItem[]) => void;
   onQuickUpdateItem: (item: ShelfItem) => void;
+  onClearAllItems: () => void;
 }
 
 export const MyShelfTab: React.FC<MyShelfTabProps> = ({
@@ -52,7 +53,10 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   onGoToScan,
   onImportItems,
   onQuickUpdateItem,
+  onClearAllItems,
 }) => {
+  const [isClearAllConfirmOpen, setIsClearAllConfirmOpen] = useState(false);
+  const [clearAllConfirmText, setClearAllConfirmText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const importFileInputRef = React.useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -71,7 +75,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
         const res = await fetch(
           `${apiUrl("coverArt")}?artist=${encodeURIComponent(item.artist)}&albumTitle=${encodeURIComponent(
             item.albumTitle
-          )}&catalogueNumber=${encodeURIComponent(item.catalogueNumber || "")}`
+          )}&catalogueNumber=${encodeURIComponent(item.catalogueNumber || "")}&matrixCode=${encodeURIComponent(item.matrixCode || "")}`
         );
         if (res.ok) {
           const data = await res.json();
@@ -458,6 +462,19 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
               <Upload className="w-3.5 h-3.5 text-[#6B655B]" />
               <span>Import</span>
             </button>
+            {shelfItems.length > 0 && (
+              <button
+                onClick={() => {
+                  setClearAllConfirmText("");
+                  setIsClearAllConfirmOpen(true);
+                }}
+                className="px-3 py-1.5 rounded-md bg-[#EFEAE0] text-[#A94A42] border border-[#D8D0C0] hover:bg-red-50 hover:border-red-300 text-xs font-sans font-bold uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer"
+                title="Delete every record on the shelf — useful before re-importing a fresh JSON file so records don't stack"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-[#A94A42]" />
+                <span>Clear All</span>
+              </button>
+            )}
             {missingCoverItems.length > 0 && (
               <button
                 onClick={handleBulkFetchCovers}
@@ -636,6 +653,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                     artist={item.artist}
                     albumTitle={item.albumTitle}
                     catalogueNumber={item.catalogueNumber}
+                    matrixCode={item.matrixCode}
                     onImageChange={(newUrl) => onQuickUpdateItem({ ...item, coverArtUrl: newUrl })}
                     className="w-20 h-20 rounded border border-[#E2DCD0] shadow-xs flex-shrink-0"
                     imgClassName="w-full h-full object-cover rounded group-hover:scale-105 transition"
@@ -807,6 +825,64 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
               <span>Scan First Vinyl Record</span>
             </button>
           )}
+        </div>
+      )}
+
+      {/* Clear All Confirmation Modal */}
+      {isClearAllConfirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+          onClick={() => setIsClearAllConfirmOpen(false)}
+        >
+          <div
+            className="bg-[#FAF8F3] border border-[#E2DCD0] rounded-xl p-6 max-w-md w-full space-y-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 text-[#A94A42]">
+              <div className="p-2.5 rounded-full bg-[#A94A42]/10 border border-[#A94A42]/20">
+                <Trash2 className="w-5 h-5 text-[#A94A42]" />
+              </div>
+              <div>
+                <h3 className="text-lg font-serif font-bold text-[#2B2B2B]">Clear Entire Shelf?</h3>
+                <p className="text-[11px] font-sans text-[#6B655B]">This cannot be undone</p>
+              </div>
+            </div>
+
+            <p className="text-xs font-sans text-[#2B2B2B] leading-relaxed bg-[#EFEAE0] p-3 rounded-lg border border-[#D8D0C0]">
+              This deletes all <strong className="text-[#A94A42]">{shelfItems.length}</strong> records currently on your shelf
+              (and syncs the deletion if you have sync turned on). Do this before re-importing a JSON file so records don't
+              stack on top of what's already here. Type <strong>DELETE</strong> below to confirm.
+            </p>
+
+            <input
+              type="text"
+              value={clearAllConfirmText}
+              onChange={(e) => setClearAllConfirmText(e.target.value)}
+              placeholder="Type DELETE to confirm"
+              className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] placeholder-[#8C857B] rounded-md px-3 py-2 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
+            />
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#E2DCD0]">
+              <button
+                type="button"
+                onClick={() => setIsClearAllConfirmOpen(false)}
+                className="px-4 py-2 rounded-md border border-[#D8D0C0] text-xs font-sans font-bold text-[#6B655B] hover:bg-[#EFEAE0] transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={clearAllConfirmText.trim().toUpperCase() !== "DELETE"}
+                onClick={() => {
+                  onClearAllItems();
+                  setIsClearAllConfirmOpen(false);
+                }}
+                className="px-4 py-2 rounded-md bg-[#A94A42] hover:bg-[#8E3E37] text-white text-xs font-sans font-bold uppercase tracking-wider transition shadow-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Delete All {shelfItems.length} Records
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

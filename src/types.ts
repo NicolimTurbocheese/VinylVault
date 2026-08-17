@@ -169,6 +169,9 @@ export interface ShelfItem extends RecordScanResult {
   valuationBreakdown?: DetailedValuationBreakdown;
   calculatedValue: RecordValueRange;
   purchasePrice?: number;
+  // ISO date string (yyyy-mm-dd) for when this copy was purchased. Defaults to the
+  // day it's added to the shelf, but is user-editable.
+  purchaseDate?: string;
   acquisitionCountry?: string;
   acquisitionTransactionType?: string;
   customNotes?: string;

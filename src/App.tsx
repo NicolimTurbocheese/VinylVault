@@ -366,6 +366,20 @@ export default function App() {
     }
   };
 
+  const handleClearAllItems = () => {
+    const idsToDelete = shelfItems.map((i) => i.id);
+    saveShelfToLocal([]);
+    showToast(`Cleared ${idsToDelete.length} record${idsToDelete.length === 1 ? "" : "s"} from shelf`);
+
+    if (vaultCode && syncStatus === "connected") {
+      for (const id of idsToDelete) {
+        deleteVaultDoc(vaultCode, "shelfItems", id).catch((err) => {
+          console.error("Failed to sync deletion to vault:", err);
+        });
+      }
+    }
+  };
+
   const handleCreateBox = (name: string) => {
     const box: VinylBox = { id: generateBoxId(), name, createdAt: new Date().toISOString() };
     saveBoxesToLocalState([...boxes, box]);
@@ -483,6 +497,7 @@ export default function App() {
             onGoToScan={() => setActiveTab("scan")}
             onImportItems={handleImportItems}
             onQuickUpdateItem={(item) => handleSaveToShelf(item, { showFeedback: false })}
+            onClearAllItems={handleClearAllItems}
           />
         </div>
 

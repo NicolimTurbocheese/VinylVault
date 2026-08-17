@@ -1,13 +1,22 @@
-import React, { useState, useEffect } from "react";
-import { X, Save, DollarSign, MapPin, Bookmark, BookmarkPlus, Award, Tag, TrendingUp, TrendingDown, Package, Plus } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { X, Save, DollarSign, MapPin, Bookmark, BookmarkPlus, Award, Tag, TrendingUp, TrendingDown, Package, Plus, Calendar, RefreshCw, Settings2, Sparkles } from "lucide-react";
 import { RecordScanResult, GoldmineGrade, GOLDMINE_GRADES, ShelfItem, ObiCondition, PackageInclusions, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { calculateAdjustedValuation, calculateCompleteValuation } from "../utils/valuation";
 import { cleanFormatSpec } from "../utils/format";
 import { normalizeDiscogsGenre, DISCOGS_MACRO_GENRES } from "../utils/genre";
 import { ACQUISITION_COUNTRIES, ACQUISITION_TRANSACTION_TYPES } from "../utils/acquisitionOptions";
+import { getStoredSubgenres, saveSubgenresToLocal } from "../utils/subgenres";
+import { apiUrl } from "../utils/apiBase";
 import { RecordCoverImage } from "./RecordCoverImage";
+import { SubgenreManagerModal } from "./SubgenreManagerModal";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
+
+const OBI_OPTIONS: ObiCondition[] = ["N/A", "M", "NM", "VG+", "VG", "G", "F_P"];
+const GRADE_OPTIONS: GoldmineGrade[] = ["M", "NM", "VG+", "VG", "G", "F_P"];
+const gradeLabel = (g: string) => (g === "F_P" ? "F/P" : g);
+
+const todayIso = () => new Date().toISOString().slice(0, 10);
 
 interface AddToShelfModalProps {
   isOpen: boolean;
@@ -46,6 +55,21 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
   const [styles, setStyles] = useState<string[]>([]);
   const [styleInput, setStyleInput] = useState<string>("");
   const [boxId, setBoxId] = useState<string>(UNCATEGORISED_BOX_ID);
+  const [matrixCode, setMatrixCode] = useState<string>("");
+  const [purchaseDate, setPurchaseDate] = useState<string>(todayIso());
+  const [subgenreLibrary, setSubgenreLibrary] = useState<string[]>(() => getStoredSubgenres());
+  const [isSubgenreManagerOpen, setIsSubgenreManagerOpen] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
+  const [proposedValuation, setProposedValuation] = useState<{
+    median: number;
+    low: number;
+    high: number;
+    rationale: string;
+  } | null>(null);
+
+  // Snapshot of the fields that should trigger a "re-run research" prompt when they
+  // change on an existing shelf record (grading, notes, matrix number).
+  const researchSnapshotRef = useRef<{ mediaGrade: GoldmineGrade; sleeveGrade: GoldmineGrade; obiCondition: ObiCondition; customNotes: string; matrixCode: string } | null>(null);
 
   useEffect(() => {
     if (existingItem) {
@@ -69,6 +93,16 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
       setAcquisitionTransactionType(existingItem.acquisitionTransactionType || "");
       setCustomNotes(existingItem.customNotes || existingItem.freeTextNotes || "");
       setCustomValuationAdj("0");
+      setMatrixCode(existingItem.matrixCode || "");
+      setPurchaseDate(existingItem.purchaseDate || (existingItem.addedAt ? existingItem.addedAt.slice(0, 10) : todayIso()));
+      setProposedValuation(null);
+      researchSnapshotRef.current = {
+        mediaGrade: existingItem.mediaGrade || "VG+",
+        sleeveGrade: existingItem.sleeveGrade || "VG+",
+        obiCondition: existingItem.obiCondition || "N/A",
+        customNotes: existingItem.customNotes || existingItem.freeTextNotes || "",
+        matrixCode: existingItem.matrixCode || "",
+      };
     } else if (record) {
       const normG = normalizeDiscogsGenre(record.genre, record.styles);
       setGenre(normG.genre);
@@ -108,6 +142,10 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
 
       setCustomNotes(aggregatedAutoNotes || record.customNotes || "");
       setCustomValuationAdj((record as any).initialValuationAdj !== undefined ? String((record as any).initialValuationAdj) : "0");
+      setMatrixCode(record.matrixCode || "");
+      setPurchaseDate(todayIso());
+      setProposedValuation(null);
+      researchSnapshotRef.current = null;
     }
   }, [existingItem, record, isOpen]);
 
@@ -156,14 +194,84 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
     setStyles((prev) => prev.filter((s) => s !== style));
   };
 
+  const addStyleFromLibrary = (style: string) => {
+    if (!style || styles.length >= 3) return;
+    if (styles.some((s) => s.toLowerCase() === style.toLowerCase())) return;
+    setStyles((prev) => [...prev, style]);
+  };
+
+  // Per the rule: if grading, custom notes, or the matrix number change on an existing
+  // shelf record, prompt a fresh valuation research pass rather than silently keeping
+  // the old estimate.
+  const snapshot = researchSnapshotRef.current;
+  const isDirtyForResearch = !!existingItem && !!snapshot && (
+    mediaGrade !== snapshot.mediaGrade ||
+    sleeveGrade !== snapshot.sleeveGrade ||
+    obiCondition !== snapshot.obiCondition ||
+    customNotes.trim() !== snapshot.customNotes.trim() ||
+    matrixCode.trim() !== snapshot.matrixCode.trim()
+  );
+
+  const handleRerunResearch = async () => {
+    setIsRecalculating(true);
+    setProposedValuation(null);
+    try {
+      const res = await fetch(apiUrl("recalculateValuation"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          albumTitle: activeRecord.albumTitle,
+          artist: activeRecord.artist,
+          catalogueNumber: activeRecord.catalogueNumber,
+          country: activeRecord.country,
+          label: activeRecord.label,
+          baseMintValue: activeRecord.baseMintValue,
+          mediaGrade,
+          sleeveGrade,
+          obiCondition,
+          packageInclusions,
+          freeTextNotes: matrixCode.trim() ? `${customNotes}\nMatrix/runout: ${matrixCode.trim()}` : customNotes,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.finalValuation) {
+        setProposedValuation({
+          median: data.finalValuation.median,
+          low: data.finalValuation.low,
+          high: data.finalValuation.high,
+          rationale: data.valuationRationale || "Updated valuation based on your changes.",
+        });
+      }
+    } catch (err) {
+      console.error("Re-run valuation research failed:", err);
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
+
+  const applyProposedValuation = () => {
+    if (!proposedValuation) return;
+    const diff = proposedValuation.median - currentValuation.median;
+    setCustomValuationAdj(String(diff));
+    setProposedValuation(null);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Any freeform sub-genre tags the user typed get added to the shared library so
+    // they show up in the picker for future records too.
+    if (styles.length > 0) {
+      saveSubgenresToLocal([...subgenreLibrary, ...styles]);
+    }
 
     const shelfPayload: ShelfItem = {
       ...activeRecord,
       coverArtUrl: coverArtUrl || activeRecord.coverArtUrl,
       genre,
       styles,
+      matrixCode: matrixCode.trim() || undefined,
+      purchaseDate,
       boxId,
       mediaGrade,
       sleeveGrade,
@@ -220,6 +328,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
               artist={activeRecord.artist}
               albumTitle={activeRecord.albumTitle}
               catalogueNumber={activeRecord.catalogueNumber}
+              matrixCode={matrixCode}
               onImageChange={(newUrl) => setCoverArtUrl(newUrl)}
               className="w-16 h-16 rounded border border-[#D8D0C0] shadow-xs flex-shrink-0"
               imgClassName="w-full h-full object-cover rounded"
@@ -280,14 +389,39 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
             </div>
 
             <div>
-              <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center gap-1.5">
-                <Tag className="w-3.5 h-3.5 text-[#A94A42]" />
-                Sub-Genres / Styles (up to 3)
+              <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center justify-between gap-1.5">
+                <span className="flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-[#A94A42]" />
+                  Sub-Genres / Styles (up to 3)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsSubgenreManagerOpen(true)}
+                  className="text-[9px] font-bold normal-case text-[#6B655B] hover:text-[#A94A42] flex items-center gap-0.5 cursor-pointer"
+                  title="Add or delete sub-genre categories"
+                >
+                  <Settings2 className="w-3 h-3" /> Manage
+                </button>
               </label>
               <div className="flex items-center gap-1.5">
+                <select
+                  value=""
+                  disabled={styles.length >= 3}
+                  onChange={(e) => addStyleFromLibrary(e.target.value)}
+                  className="flex-1 min-w-0 bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] rounded-md px-3 py-2 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition disabled:opacity-50"
+                >
+                  <option value="">{styles.length >= 3 ? "Max 3 styles" : "Select a sub-genre..."}</option>
+                  {subgenreLibrary
+                    .filter((s) => !styles.some((st) => st.toLowerCase() === s.toLowerCase()))
+                    .map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-1.5 mt-1.5">
                 <input
                   type="text"
-                  placeholder={styles.length >= 3 ? "Max 3 styles" : "e.g. Prog Rock"}
+                  placeholder={styles.length >= 3 ? "Max 3 styles" : "Or type a new one..."}
                   value={styleInput}
                   disabled={styles.length >= 3}
                   onChange={(e) => setStyleInput(e.target.value)}
@@ -332,16 +466,22 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
             </div>
           </div>
 
-          {/* Condition Grading Displays */}
+          {/* Condition Grading Selectors */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-sans">
             <div>
               <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center gap-1.5">
                 <Award className="w-3.5 h-3.5 text-[#A94A42]" />
                 Media Grade
               </label>
-              <div className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] font-sans font-medium rounded-md px-3 py-2 text-xs shadow-xs min-h-[38px] flex items-center">
-                {mediaGrade === "F_P" ? "F/P" : mediaGrade || "N/A"}
-              </div>
+              <select
+                value={mediaGrade}
+                onChange={(e) => setMediaGrade(e.target.value as GoldmineGrade)}
+                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] font-sans font-medium rounded-md px-3 py-2 text-xs focus:outline-none focus:border-[#A94A42] transition"
+              >
+                {GRADE_OPTIONS.map((g) => (
+                  <option key={g} value={g}>{gradeLabel(g)}</option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -349,9 +489,15 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
                 <Award className="w-3.5 h-3.5 text-[#A94A42]" />
                 Sleeve Grade
               </label>
-              <div className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] font-sans font-medium rounded-md px-3 py-2 text-xs shadow-xs min-h-[38px] flex items-center">
-                {sleeveGrade === "F_P" ? "F/P" : sleeveGrade || "N/A"}
-              </div>
+              <select
+                value={sleeveGrade}
+                onChange={(e) => setSleeveGrade(e.target.value as GoldmineGrade)}
+                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] font-sans font-medium rounded-md px-3 py-2 text-xs focus:outline-none focus:border-[#A94A42] transition"
+              >
+                {GRADE_OPTIONS.map((g) => (
+                  <option key={g} value={g}>{gradeLabel(g)}</option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -359,9 +505,90 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
                 <Tag className="w-3.5 h-3.5 text-[#A94A42]" />
                 Obi Strip
               </label>
-              <div className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] font-sans font-medium rounded-md px-2.5 py-2 text-xs shadow-xs min-h-[38px] flex items-center leading-tight">
-                {obiCondition === "F_P" ? "F/P" : (!obiCondition || obiCondition === "none" || obiCondition === "N/A" ? "N/A" : obiCondition)}
+              <select
+                value={obiCondition}
+                onChange={(e) => setObiCondition(e.target.value as ObiCondition)}
+                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] font-sans font-medium rounded-md px-2.5 py-2 text-xs focus:outline-none focus:border-[#A94A42] transition"
+              >
+                {OBI_OPTIONS.map((o) => (
+                  <option key={o} value={o}>{gradeLabel(o)}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Re-run Research Prompt: shown when grading/notes/matrix changed on an existing record */}
+          {isDirtyForResearch && !proposedValuation && (
+            <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-amber-50 border border-amber-300 text-xs font-sans">
+              <span className="text-amber-800">
+                Grading, notes, or matrix number changed — re-run research to get an updated value estimate?
+              </span>
+              <button
+                type="button"
+                onClick={handleRerunResearch}
+                disabled={isRecalculating}
+                className="shrink-0 px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5 transition disabled:opacity-60 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRecalculating ? "animate-spin" : ""}`} />
+                {isRecalculating ? "Researching..." : "Re-run Research"}
+              </button>
+            </div>
+          )}
+
+          {proposedValuation && (
+            <div className="p-3 rounded-lg bg-[#2D4A3E]/5 border border-[#2D4A3E]/30 text-xs font-sans space-y-2">
+              <div className="flex items-center gap-1.5 text-[#2D4A3E] font-bold uppercase tracking-wider text-[10px]">
+                <Sparkles className="w-3.5 h-3.5" /> Proposed Updated Estimate: S${proposedValuation.median.toFixed(2)}
+                <span className="font-normal normal-case text-[#6B655B]">
+                  (range S${proposedValuation.low} - S${proposedValuation.high})
+                </span>
               </div>
+              <p className="text-[#2B2B2B] leading-relaxed">{proposedValuation.rationale}</p>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setProposedValuation(null)}
+                  className="px-3 py-1.5 rounded-md border border-[#D8D0C0] text-[10px] font-bold uppercase tracking-wider text-[#6B655B] hover:bg-[#EFEAE0] transition cursor-pointer"
+                >
+                  Keep Current Value
+                </button>
+                <button
+                  type="button"
+                  onClick={applyProposedValuation}
+                  className="px-3 py-1.5 rounded-md bg-[#2D4A3E] hover:bg-[#213A2F] text-white text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
+                >
+                  Use This Value
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Matrix Code + Purchase Date */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-[#A94A42]" />
+                Matrix / Runout Code
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. MWZ 8107 A-1"
+                value={matrixCode}
+                onChange={(e) => setMatrixCode(e.target.value)}
+                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] placeholder-[#8C857B] rounded-md px-3 py-2 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-[#A94A42]" />
+                Purchase Date
+              </label>
+              <input
+                type="date"
+                value={purchaseDate}
+                onChange={(e) => setPurchaseDate(e.target.value)}
+                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] rounded-md px-3 py-2 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
+              />
             </div>
           </div>
 
@@ -375,23 +602,42 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
             return (
               <div className="p-3.5 rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] font-sans space-y-3 shadow-xs">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* 1. Final Est. Value */}
+                  {/* 1. Final Est. Value (editable — overrides the computed value) */}
                   <div className="p-3.5 rounded-lg bg-[#EFEAE0] border border-[#D8D0C0] flex flex-col justify-between">
                     <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] block mb-1">
                       Final Est. Value
                     </span>
-                    <div className="text-lg sm:text-xl font-serif font-bold text-[#A94A42]">
-                      S${estVal.toFixed(2)}
+                    <div className="flex items-center gap-1 text-[#A94A42]">
+                      <span className="text-lg sm:text-xl font-serif font-bold">S$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={estVal.toFixed(2)}
+                        onChange={(e) => {
+                          const entered = parseFloat(e.target.value);
+                          if (isNaN(entered)) return;
+                          setCustomValuationAdj(String(entered - currentValuation.median));
+                        }}
+                        className="w-full min-w-0 bg-transparent text-lg sm:text-xl font-serif font-bold text-[#A94A42] focus:outline-none border-b border-transparent focus:border-[#A94A42] transition"
+                      />
                     </div>
                   </div>
 
-                  {/* 2. Purchase Price */}
+                  {/* 2. Purchase Price (editable) */}
                   <div className="p-3.5 rounded-lg bg-[#EFEAE0] border border-[#D8D0C0] flex flex-col justify-between">
                     <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] block mb-1">
                       Purchase Price
                     </span>
-                    <div className="text-lg sm:text-xl font-serif font-bold text-[#A94A42]">
-                      {pPriceNum !== null ? `S$${pPriceNum.toFixed(2)}` : "N/A"}
+                    <div className="flex items-center gap-1 text-[#A94A42]">
+                      <span className="text-lg sm:text-xl font-serif font-bold">S$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={purchasePrice}
+                        onChange={(e) => setPurchasePrice(e.target.value)}
+                        className="w-full min-w-0 bg-transparent text-lg sm:text-xl font-serif font-bold text-[#A94A42] placeholder-[#A94A42]/40 focus:outline-none border-b border-transparent focus:border-[#A94A42] transition"
+                      />
                     </div>
                   </div>
 
@@ -518,6 +764,17 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
           </div>
         </form>
       </div>
+
+      <SubgenreManagerModal
+        isOpen={isSubgenreManagerOpen}
+        onClose={() => setIsSubgenreManagerOpen(false)}
+        subgenres={subgenreLibrary}
+        onChange={(updated) => {
+          setSubgenreLibrary(updated);
+          saveSubgenresToLocal(updated);
+          setStyles((prev) => prev.filter((s) => updated.some((u) => u.toLowerCase() === s.toLowerCase())));
+        }}
+      />
     </div>
   );
 };
