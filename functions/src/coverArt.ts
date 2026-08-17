@@ -23,6 +23,7 @@ export const coverArt = onRequest(
       }
 
       const results: string[] = [];
+      let tracklist: { position: string; title: string; duration?: string }[] = [];
       const discogsToken = discogsApiTokenSecret.value();
       const discogsHeaders: Record<string, string> = {
         "User-Agent": "VinylVault/1.0 (+https://vinylvault.app)",
@@ -80,10 +81,12 @@ export const coverArt = onRequest(
                 if (matchesTitle && matchesArtist) {
                   results.push(img);
 
-                  // With an authenticated token, pull the full release record for this
-                  // specific pressing — it carries every photo submitted for that exact
-                  // release (sleeve variants, obi, labels), not just the one search thumbnail.
-                  if (discogsToken && r.resource_url && results.length <= 1) {
+                  // Pull the full release record for this specific pressing — with an
+                  // authenticated token it carries every photo submitted for that exact
+                  // release (sleeve variants, obi, labels), not just the one search
+                  // thumbnail; either way it also carries the release's tracklist, which
+                  // the search endpoint doesn't return.
+                  if (r.resource_url && results.length <= 1) {
                     try {
                       const relRes = await fetch(r.resource_url, { headers: discogsHeaders });
                       if (relRes.ok) {
@@ -95,6 +98,16 @@ export const coverArt = onRequest(
                             results.push(fullImg);
                           }
                           if (results.length >= 4) break;
+                        }
+                        const dTracks: any[] = relJson?.tracklist || [];
+                        if (dTracks.length > 0 && tracklist.length === 0) {
+                          tracklist = dTracks
+                            .filter((t) => t.type_ !== "heading")
+                            .map((t, idx) => ({
+                              position: t.position || `A${idx + 1}`,
+                              title: t.title || `Track ${idx + 1}`,
+                              duration: t.duration || undefined,
+                            }));
                         }
                       }
                     } catch (relErr) {
@@ -191,6 +204,34 @@ export const coverArt = onRequest(
                 if (!results.includes(caaUrl)) {
                   results.push(caaUrl);
                 }
+
+                if (tracklist.length === 0 && rel.id) {
+                  try {
+                    const relDetailRes = await fetch(
+                      `https://musicbrainz.org/ws/2/release/${rel.id}?inc=recordings&fmt=json`,
+                      { headers: { "User-Agent": "VinylVault/1.0 (contact@vinylvault.app)" } }
+                    );
+                    if (relDetailRes.ok) {
+                      const relDetail: any = await relDetailRes.json();
+                      const media = relDetail?.media?.[0];
+                      const mbTracks: any[] = media?.tracks || [];
+                      if (mbTracks.length > 0) {
+                        tracklist = mbTracks.map((t, idx) => {
+                          const durMs = t.length || t.recording?.length;
+                          const durStr = durMs ? `${Math.floor(durMs / 60000)}:${String(Math.floor((durMs % 60000) / 1000)).padStart(2, "0")}` : undefined;
+                          return {
+                            position: t.number || String(idx + 1),
+                            title: t.title || t.recording?.title || `Track ${idx + 1}`,
+                            duration: durStr,
+                          };
+                        });
+                      }
+                    }
+                  } catch (trackErr) {
+                    console.warn("MusicBrainz tracklist fetch error:", trackErr);
+                  }
+                }
+
                 if (results.length >= 2) break;
               }
             }
@@ -277,7 +318,8 @@ export const coverArt = onRequest(
         albumTitle,
         artist,
         catalogueNumber,
-        results
+        results,
+        tracklist
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to search cover art." });

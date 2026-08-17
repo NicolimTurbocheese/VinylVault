@@ -28,7 +28,8 @@ import {
   Shuffle,
   CheckSquare,
   Eye,
-  EyeOff
+  EyeOff,
+  ListMusic
 } from "lucide-react";
 import { ShelfItem, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { exportToCSV, exportToJSON } from "../utils/valuation";
@@ -70,6 +71,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   const importFileInputRef = React.useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [coverFetchProgress, setCoverFetchProgress] = useState<{ done: number; total: number; found: number } | null>(null);
+  const [tracklistFetchProgress, setTracklistFetchProgress] = useState<{ done: number; total: number; found: number } | null>(null);
   const [recalcProgress, setRecalcProgress] = useState<{ done: number; total: number; changed: number } | null>(null);
   const [isRecalcConfirmOpen, setIsRecalcConfirmOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -218,9 +220,14 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
         if (res.ok) {
           const data = await res.json();
           const url = data.results?.[0];
-          if (url) {
-            onQuickUpdateItem({ ...item, coverArtUrl: url });
-            found++;
+          const fetchedTracklist = data.tracklist?.length > 0 ? data.tracklist : undefined;
+          if (url || fetchedTracklist) {
+            onQuickUpdateItem({
+              ...item,
+              ...(url ? { coverArtUrl: url } : {}),
+              ...(fetchedTracklist && (!item.tracklist || item.tracklist.length === 0) ? { tracklist: fetchedTracklist } : {}),
+            });
+            if (url) found++;
           }
         }
       } catch (err) {
@@ -229,6 +236,36 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
       setCoverFetchProgress({ done: i + 1, total: targets.length, found });
     }
     setTimeout(() => setCoverFetchProgress(null), 4000);
+  };
+
+  const missingTracklistItems = shelfItems.filter((i) => !i.tracklist || i.tracklist.length === 0);
+
+  const handleBulkFetchTracklists = async () => {
+    const targets = missingTracklistItems;
+    if (targets.length === 0) return;
+    setTracklistFetchProgress({ done: 0, total: targets.length, found: 0 });
+    let found = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const item = targets[i];
+      try {
+        const res = await fetch(
+          `${apiUrl("coverArt")}?artist=${encodeURIComponent(item.artist)}&albumTitle=${encodeURIComponent(
+            item.albumTitle
+          )}&catalogueNumber=${encodeURIComponent(item.catalogueNumber || "")}&matrixCode=${encodeURIComponent(item.matrixCode || "")}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data.tracklist && data.tracklist.length > 0) {
+            onQuickUpdateItem({ ...item, tracklist: data.tracklist });
+            found++;
+          }
+        }
+      } catch (err) {
+        console.warn("Bulk tracklist fetch failed for", item.albumTitle, err);
+      }
+      setTracklistFetchProgress({ done: i + 1, total: targets.length, found });
+    }
+    setTimeout(() => setTracklistFetchProgress(null), 4000);
   };
 
   const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -722,6 +759,24 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                 <button
                   onClick={() => {
                     setIsMoreMenuOpen(false);
+                    handleBulkFetchTracklists();
+                  }}
+                  disabled={missingTracklistItems.length === 0 || !!tracklistFetchProgress}
+                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ListMusic className={`w-3.5 h-3.5 text-[#6B655B] ${tracklistFetchProgress ? "animate-pulse" : ""}`} />
+                  <span>
+                    {tracklistFetchProgress
+                      ? `Fetching Tracklists ${tracklistFetchProgress.done}/${tracklistFetchProgress.total}`
+                      : missingTracklistItems.length > 0
+                      ? `Fetch ${missingTracklistItems.length} Missing Tracklist${missingTracklistItems.length === 1 ? "" : "s"}`
+                      : "Fetch Missing Tracklists"}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
                     setIsRecalcConfirmOpen(true);
                   }}
                   disabled={shelfItems.length === 0 || !!recalcProgress}
@@ -780,6 +835,12 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
         {recalcProgress && recalcProgress.done === recalcProgress.total && (
           <div className="text-xs font-sans text-[#6B655B] bg-[#EFEAE0] border border-[#D8D0C0] rounded-md px-3 py-2">
             Recalculated {recalcProgress.changed} of {recalcProgress.total} records' Est. Value using the current valuation engine.
+          </div>
+        )}
+        {tracklistFetchProgress && tracklistFetchProgress.done === tracklistFetchProgress.total && (
+          <div className="text-xs font-sans text-[#6B655B] bg-[#EFEAE0] border border-[#D8D0C0] rounded-md px-3 py-2">
+            Found tracklists for {tracklistFetchProgress.found} of {tracklistFetchProgress.total} records. The rest genuinely
+            couldn't be matched in Discogs/MusicBrainz.
           </div>
         )}
       </div>
@@ -1077,6 +1138,24 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                         Photos
                       </span>
                     )}
+                  </div>
+                )}
+
+                {/* Tracklist Preview */}
+                {cardDensity === "detailed" && item.tracklist && item.tracklist.length > 0 && (
+                  <div className="p-2.5 rounded-md bg-[#EFEAE0] border border-[#D8D0C0] font-sans">
+                    <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-[#A94A42] mb-1.5">
+                      <ListMusic className="w-3 h-3" />
+                      <span>Tracklist ({item.tracklist.length})</span>
+                    </div>
+                    <div className="space-y-0.5 max-h-24 overflow-y-auto">
+                      {item.tracklist.map((track, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-[10px] text-[#2B2B2B]">
+                          <span className="truncate flex-1"><strong className="text-[#A94A42]">{track.position}</strong> {track.title}</span>
+                          {track.duration && <span className="text-[#6B655B] shrink-0 ml-2">{track.duration}</span>}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
