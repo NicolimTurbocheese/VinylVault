@@ -22,7 +22,10 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend
+  Legend,
+  LineChart,
+  Line,
+  CartesianGrid
 } from "recharts";
 import { ShelfItem } from "../types";
 import { useCountUp } from "../hooks/useCountUp";
@@ -117,6 +120,23 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
   }));
 
   const COLORS = ["#D4AF37", "#FFBF00", "#997A15", "#B38F24", "#66520E", "#E5C158"];
+
+  // 5. Collection value over time — a running total of estimated value as records were
+  // acquired, sorted by "Added" date. This tracks how the collection's value grew as it
+  // was built (acquisition order), not fluctuations in an already-owned item's market
+  // price over time — the app doesn't take periodic re-valuation snapshots, so a true
+  // "market price history" chart isn't something honest data supports yet.
+  const valueOverTimeData = [...shelfItems]
+    .filter((i) => i.addedAt)
+    .sort((a, b) => new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime())
+    .reduce<{ date: string; value: number }[]>((acc, item) => {
+      const prevValue = acc.length > 0 ? acc[acc.length - 1].value : 0;
+      acc.push({
+        date: new Date(item.addedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" }),
+        value: prevValue + (item.calculatedValue?.median || 0),
+      });
+      return acc;
+    }, []);
 
   // 5. Top 5 Most Valuable
   const topValuable = [...shelfItems]
@@ -246,6 +266,33 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Collection Value Over Time */}
+      {valueOverTimeData.length > 1 && (
+        <div className="p-6 rounded-lg bg-[#161616] border border-[#D4AF37]/20 shadow-2xl space-y-4">
+          <div className="flex items-center justify-between border-b border-white/5 pb-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-[#D4AF37]" />
+              <h3 className="font-serif font-bold text-white text-base">Collection Value Over Time</h3>
+            </div>
+            <span className="text-xs font-mono text-zinc-400">By acquisition order</span>
+          </div>
+          <div className="h-64 w-full pt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={valueOverTimeData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis dataKey="date" stroke="#888888" fontSize={10} fontFamily="JetBrains Mono" interval="preserveStartEnd" />
+                <YAxis stroke="#888888" fontSize={11} fontFamily="JetBrains Mono" />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "#0C0C0C", borderColor: "#D4AF37", borderRadius: "4px", color: "#FFBF00", fontFamily: "JetBrains Mono" }}
+                  formatter={(val: number) => [`S$${val.toLocaleString()}`, "Cumulative Value"]}
+                />
+                <Line type="monotone" dataKey="value" stroke="#D4AF37" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Top 5 Most Valuable Pressings Leaderboard */}
       <div className="p-6 rounded-lg bg-[#161616] border border-[#D4AF37]/20 shadow-2xl space-y-4">

@@ -24,7 +24,9 @@ import {
   RefreshCw,
   MoreVertical,
   FileText,
-  X
+  X,
+  Shuffle,
+  CheckSquare
 } from "lucide-react";
 import { ShelfItem, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { exportToCSV, exportToJSON } from "../utils/valuation";
@@ -84,6 +86,63 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
 
   const missingCoverItems = shelfItems.filter((i) => !i.coverArtUrl);
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[] | null>(null);
+  const [randomPick, setRandomPick] = useState<ShelfItem | null>(null);
+  const [randomPickGenre, setRandomPickGenre] = useState<string>("");
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBoxId, setBulkBoxId] = useState<string>("");
+  const [bulkGenre, setBulkGenre] = useState<string>("");
+  const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const exitSelectMode = () => {
+    setIsSelectMode(false);
+    setSelectedIds(new Set());
+    setBulkBoxId("");
+    setBulkGenre("");
+  };
+
+  const applyBulkBox = () => {
+    if (!bulkBoxId) return;
+    for (const item of shelfItems) {
+      if (selectedIds.has(item.id)) {
+        onQuickUpdateItem({ ...item, boxId: bulkBoxId === UNCATEGORISED_BOX_ID ? undefined : bulkBoxId });
+      }
+    }
+  };
+
+  const applyBulkGenre = () => {
+    if (!bulkGenre) return;
+    for (const item of shelfItems) {
+      if (selectedIds.has(item.id)) {
+        onQuickUpdateItem({ ...item, genre: bulkGenre });
+      }
+    }
+  };
+
+  const applyBulkDelete = () => {
+    for (const id of selectedIds) {
+      onDeleteItem(id);
+    }
+    setIsBulkDeleteConfirmOpen(false);
+    exitSelectMode();
+  };
+
+  const pickRandom = (genreFilter: string) => {
+    const pool = genreFilter
+      ? shelfItems.filter((i) => normalizeDiscogsGenre(i.genre, i.styles).genre === genreFilter)
+      : shelfItems;
+    if (pool.length === 0) return; // keep the modal open, current pick stays shown
+    setRandomPick(pool[Math.floor(Math.random() * pool.length)]);
+  };
 
   const handleFlagDuplicateGroup = (group: DuplicateGroup) => {
     const note = `Possible duplicate: ${group.items.length} records share the exact same artist + album title. Could be two different pressings you legitimately own, or a duplicate entry — please confirm.`;
@@ -201,12 +260,14 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   const [viewMode, setViewMode] = useState<"grid" | "coverflow">("grid");
   const [itemToDelete, setItemToDelete] = useState<ShelfItem | null>(null);
 
-  const anyModalOpen = !!itemToDelete || isClearAllConfirmOpen || isRecalcConfirmOpen || !!duplicateGroups;
+  const anyModalOpen = !!itemToDelete || isClearAllConfirmOpen || isRecalcConfirmOpen || !!duplicateGroups || !!randomPick || isBulkDeleteConfirmOpen;
   useEscapeToClose(anyModalOpen, () => {
     setItemToDelete(null);
     setIsClearAllConfirmOpen(false);
     setIsRecalcConfirmOpen(false);
     setDuplicateGroups(null);
+    setRandomPick(null);
+    setIsBulkDeleteConfirmOpen(false);
   });
   useBodyScrollLock(anyModalOpen);
 
@@ -512,6 +573,35 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             </button>
           </div>
 
+          {shelfItems.length > 0 && (
+            <button
+              onClick={() => {
+                setRandomPickGenre("");
+                pickRandom("");
+              }}
+              title="Pick a random record to play tonight"
+              className="px-2.5 py-1.5 rounded-md border border-[#D8D0C0] bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
+            >
+              <Shuffle className="w-3.5 h-3.5" />
+              <span>Random</span>
+            </button>
+          )}
+
+          {shelfItems.length > 0 && (
+            <button
+              onClick={() => (isSelectMode ? exitSelectMode() : setIsSelectMode(true))}
+              title="Select multiple records to batch-edit"
+              className={`px-2.5 py-1.5 rounded-md border flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer ${
+                isSelectMode
+                  ? "bg-[#A94A42] text-white border-[#A94A42]"
+                  : "border-[#D8D0C0] bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40"
+              }`}
+            >
+              <CheckSquare className="w-3.5 h-3.5" />
+              <span>{isSelectMode ? `${selectedIds.size} Selected` : "Select"}</span>
+            </button>
+          )}
+
           <div className="flex items-center gap-1.5 text-xs text-[#6B655B]">
             <ArrowUpDown className="w-3.5 h-3.5 text-[#A94A42]" />
             <span className="uppercase text-[10px] tracking-wider font-bold">Sort:</span>
@@ -778,6 +868,63 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
         </div>
       )}
 
+      {/* Bulk Edit Action Bar */}
+      {isSelectMode && selectedIds.size > 0 && (
+        <div className="sticky top-2 z-20 p-3 rounded-lg bg-[#2B2B2B] text-white shadow-xl flex flex-wrap items-center gap-3 font-sans">
+          <span className="text-xs font-bold uppercase tracking-wider">{selectedIds.size} Selected</span>
+
+          <select
+            value={bulkBoxId}
+            onChange={(e) => setBulkBoxId(e.target.value)}
+            className="bg-white/10 border border-white/20 text-white rounded-md px-2 py-1.5 text-xs focus:outline-none"
+          >
+            <option value="">Assign to box...</option>
+            <option value={UNCATEGORISED_BOX_ID}>Uncategorised</option>
+            {boxes.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+          <button
+            onClick={applyBulkBox}
+            disabled={!bulkBoxId}
+            className="px-2.5 py-1.5 rounded-md bg-white/10 hover:bg-white/20 text-xs font-bold uppercase tracking-wider transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Apply
+          </button>
+
+          <select
+            value={bulkGenre}
+            onChange={(e) => setBulkGenre(e.target.value)}
+            className="bg-white/10 border border-white/20 text-white rounded-md px-2 py-1.5 text-xs focus:outline-none"
+          >
+            <option value="">Set genre...</option>
+            {DISCOGS_MACRO_GENRES.map((g) => (
+              <option key={g} value={g}>{g}</option>
+            ))}
+          </select>
+          <button
+            onClick={applyBulkGenre}
+            disabled={!bulkGenre}
+            className="px-2.5 py-1.5 rounded-md bg-white/10 hover:bg-white/20 text-xs font-bold uppercase tracking-wider transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Apply
+          </button>
+
+          <button
+            onClick={() => setIsBulkDeleteConfirmOpen(true)}
+            className="px-2.5 py-1.5 rounded-md bg-red-900/40 hover:bg-red-900/60 text-red-200 text-xs font-bold uppercase tracking-wider transition cursor-pointer ml-auto"
+          >
+            Delete Selected
+          </button>
+          <button
+            onClick={exitSelectMode}
+            className="px-2.5 py-1.5 rounded-md border border-white/20 hover:bg-white/10 text-xs font-bold uppercase tracking-wider transition cursor-pointer"
+          >
+            Done
+          </button>
+        </div>
+      )}
+
       {/* Collection Grid View */}
       {sortedItems.length > 0 ? (
         viewMode === "grid" && (
@@ -785,9 +932,14 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
           {sortedItems.map((item) => (
             <div
               key={item.id}
-              className="spotlight-card rounded-lg bg-[#FAF8F3] border border-[#E2DCD0] hover:border-[#A94A42]/40 p-5 shadow-sm hover:shadow-lg transition flex flex-col justify-between group [transform-style:preserve-3d] will-change-transform"
+              onClick={isSelectMode ? () => toggleSelected(item.id) : undefined}
+              className={`spotlight-card relative rounded-lg bg-[#FAF8F3] border p-5 shadow-sm transition flex flex-col justify-between group [transform-style:preserve-3d] will-change-transform ${
+                isSelectMode
+                  ? `cursor-pointer ${selectedIds.has(item.id) ? "border-[#A94A42] ring-2 ring-[#A94A42]/40" : "border-[#E2DCD0] hover:border-[#A94A42]/40"}`
+                  : "border-[#E2DCD0] hover:border-[#A94A42]/40 hover:shadow-lg"
+              }`}
               onMouseMove={(e) => {
-                if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+                if (isSelectMode || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
                 const card = e.currentTarget;
                 const rect = card.getBoundingClientRect();
                 const px = (e.clientX - rect.left) / rect.width - 0.5;
@@ -800,6 +952,15 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                 e.currentTarget.style.transform = "";
               }}
             >
+              {isSelectMode && (
+                <div
+                  className={`absolute top-3 right-3 z-10 w-5 h-5 rounded border-2 flex items-center justify-center ${
+                    selectedIds.has(item.id) ? "bg-[#A94A42] border-[#A94A42]" : "bg-white border-[#D8D0C0]"
+                  }`}
+                >
+                  {selectedIds.has(item.id) && <CheckSquare className="w-3.5 h-3.5 text-white" />}
+                </div>
+              )}
               <div className="space-y-4">
                 {/* Header with artwork */}
                 <div className="flex items-start gap-4">
@@ -980,6 +1141,106 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
               <span>Scan First Vinyl Record</span>
             </button>
           )}
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {isBulkDeleteConfirmOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+          onClick={() => setIsBulkDeleteConfirmOpen(false)}
+        >
+          <div
+            className="bg-[#FAF8F3] border border-[#E2DCD0] rounded-xl p-6 max-w-md w-full space-y-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 text-[#A94A42]">
+              <div className="p-2.5 rounded-full bg-[#A94A42]/10 border border-[#A94A42]/20">
+                <Trash2 className="w-5 h-5 text-[#A94A42]" />
+              </div>
+              <h3 className="text-lg font-serif font-bold text-[#2B2B2B]">Delete {selectedIds.size} Selected Records?</h3>
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#E2DCD0]">
+              <button
+                onClick={() => setIsBulkDeleteConfirmOpen(false)}
+                className="px-4 py-2 rounded-md border border-[#D8D0C0] text-xs font-sans font-bold text-[#6B655B] hover:bg-[#EFEAE0] transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={applyBulkDelete}
+                className="px-4 py-2 rounded-md bg-[#A94A42] hover:bg-[#8E3E37] text-white text-xs font-sans font-bold uppercase tracking-wider transition shadow-sm cursor-pointer"
+              >
+                Delete {selectedIds.size} Records
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Random Record Picker Modal */}
+      {randomPick && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in"
+          onClick={() => setRandomPick(null)}
+        >
+          <div
+            className="bg-[#FAF8F3] border border-[#E2DCD0] rounded-xl p-6 max-w-sm w-full space-y-4 shadow-2xl text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-center gap-2 text-[#A94A42]">
+              <Shuffle className="w-5 h-5" />
+              <h3 className="text-sm font-bold uppercase tracking-wider">What Should I Play Tonight?</h3>
+            </div>
+
+            <RecordCoverImage
+              src={randomPick.coverArtUrl}
+              artist={randomPick.artist}
+              albumTitle={randomPick.albumTitle}
+              catalogueNumber={randomPick.catalogueNumber}
+              showRefreshOverlay={false}
+              className="w-40 h-40 mx-auto rounded-lg border border-[#D8D0C0] shadow-md"
+              imgClassName="w-full h-full object-cover rounded-lg"
+            />
+
+            <div>
+              <h4 className="font-serif font-bold text-lg text-[#2B2B2B]">{randomPick.albumTitle}</h4>
+              <p className="text-sm text-[#A94A42] font-medium">{randomPick.artist}</p>
+              <p className="text-[11px] text-[#6B655B] mt-1">
+                {randomPick.releaseYear} · {randomPick.label} · {normalizeDiscogsGenre(randomPick.genre, randomPick.styles).genre}
+              </p>
+            </div>
+
+            <select
+              value={randomPickGenre}
+              onChange={(e) => {
+                setRandomPickGenre(e.target.value);
+                pickRandom(e.target.value);
+              }}
+              className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] rounded-md px-3 py-2 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
+            >
+              <option value="">Any genre</option>
+              {DISCOGS_MACRO_GENRES.map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
+
+            <div className="flex items-center justify-center gap-3 pt-1">
+              <button
+                onClick={() => setRandomPick(null)}
+                className="px-4 py-2 rounded-md border border-[#D8D0C0] text-xs font-sans font-bold text-[#6B655B] hover:bg-[#EFEAE0] transition cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => pickRandom(randomPickGenre)}
+                className="px-4 py-2 rounded-md bg-[#A94A42] hover:bg-[#8E3E37] text-white text-xs font-sans font-bold uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <Shuffle className="w-3.5 h-3.5" />
+                <span>Pick Another</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
