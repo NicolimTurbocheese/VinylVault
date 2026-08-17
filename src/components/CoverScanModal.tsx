@@ -1,8 +1,19 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { Camera, X, RefreshCw, CheckCircle, Sparkles, RotateCcw } from "lucide-react";
+import { Camera, X, RefreshCw, CheckCircle, Sparkles, RotateCcw, Crop } from "lucide-react";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { autoEnhance, canvasToCompressedDataUrl } from "../utils/imageProcessing";
+import { warpPerspective, Point } from "../utils/perspectiveTransform";
+
+// Percentage-based (0-100) corner positions over the displayed image — order:
+// top-left, top-right, bottom-right, bottom-left. Defaults to the image's own
+// corners, i.e. a no-op crop until the user drags a handle.
+const DEFAULT_CORNERS: Point[] = [
+  { x: 2, y: 2 },
+  { x: 98, y: 2 },
+  { x: 98, y: 98 },
+  { x: 2, y: 98 },
+];
 
 interface CoverScanModalProps {
   isOpen: boolean;
@@ -32,6 +43,10 @@ export const CoverScanModal: React.FC<CoverScanModalProps> = ({ isOpen, onClose,
   const [holdSteadyProgress, setHoldSteadyProgress] = useState(0);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [enhanced, setEnhanced] = useState(true);
+  const [isCropMode, setIsCropMode] = useState(false);
+  const [corners, setCorners] = useState<Point[]>(DEFAULT_CORNERS);
+  const cropContainerRef = useRef<HTMLDivElement | null>(null);
+  const draggingCornerRef = useRef<number | null>(null);
 
   const stopCamera = useCallback(() => {
     if (sampleTimerRef.current) {
@@ -47,6 +62,8 @@ export const CoverScanModal: React.FC<CoverScanModalProps> = ({ isOpen, onClose,
   const handleClose = () => {
     stopCamera();
     setCapturedImage(null);
+    setIsCropMode(false);
+    setCorners(DEFAULT_CORNERS);
     onClose();
   };
 
@@ -147,6 +164,8 @@ export const CoverScanModal: React.FC<CoverScanModalProps> = ({ isOpen, onClose,
     prevFrameRef.current = null;
     stableStreakRef.current = 0;
     setHoldSteadyProgress(0);
+    setIsCropMode(false);
+    setCorners(DEFAULT_CORNERS);
   };
 
   const handleUsePhoto = () => {
@@ -157,6 +176,54 @@ export const CoverScanModal: React.FC<CoverScanModalProps> = ({ isOpen, onClose,
     onCapture(finalUrl);
     setCapturedImage(null);
     onClose();
+  };
+
+  // Corner-handle dragging (pointer events cover both mouse and touch). Position is
+  // tracked as a percentage of the image container so it stays correct across resizes.
+  const handleCornerPointerDown = (index: number) => (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    draggingCornerRef.current = index;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handleCornerPointerMove = (e: React.PointerEvent) => {
+    const idx = draggingCornerRef.current;
+    const container = cropContainerRef.current;
+    if (idx === null || !container) return;
+    const rect = container.getBoundingClientRect();
+    const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+    setCorners((prev) => {
+      const next = [...prev];
+      next[idx] = { x, y };
+      return next;
+    });
+  };
+
+  const handleCornerPointerUp = () => {
+    draggingCornerRef.current = null;
+  };
+
+  const handleApplyCrop = () => {
+    const canvas = captureCanvasRef.current;
+    if (!canvas) return;
+    const pixelQuad: Point[] = corners.map((c) => ({
+      x: (c.x / 100) * canvas.width,
+      y: (c.y / 100) * canvas.height,
+    }));
+    const warped = warpPerspective(canvas, pixelQuad, 900);
+    if (enhanced) autoEnhance(warped);
+
+    // Replace the working capture canvas with the warped result so "Use This Photo"
+    // downstream picks it up, and update the preview.
+    canvas.width = warped.width;
+    canvas.height = warped.height;
+    const ctx = canvas.getContext("2d");
+    ctx?.drawImage(warped, 0, 0);
+    setCapturedImage(canvas.toDataURL("image/jpeg", 0.9));
+    setIsCropMode(false);
+    setCorners(DEFAULT_CORNERS);
   };
 
   const toggleFacingMode = () => setFacingMode((prev) => (prev === "environment" ? "user" : "environment"));
@@ -195,6 +262,32 @@ export const CoverScanModal: React.FC<CoverScanModalProps> = ({ isOpen, onClose,
                 </button>
               )}
             </div>
+          ) : capturedImage && isCropMode ? (
+            <div
+              ref={cropContainerRef}
+              className="relative w-full max-h-full select-none touch-none"
+              onPointerMove={handleCornerPointerMove}
+              onPointerUp={handleCornerPointerUp}
+            >
+              <img src={capturedImage} alt="Adjust corners" className="w-full h-auto block pointer-events-none select-none" draggable={false} />
+              <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polygon
+                  points={corners.map((c) => `${c.x},${c.y}`).join(" ")}
+                  fill="rgba(245,158,11,0.15)"
+                  stroke="rgb(245,158,11)"
+                  strokeWidth={0.5}
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+              {corners.map((c, i) => (
+                <div
+                  key={i}
+                  onPointerDown={handleCornerPointerDown(i)}
+                  className="absolute w-6 h-6 -ml-3 -mt-3 rounded-full bg-amber-500 border-2 border-white shadow-lg cursor-grab active:cursor-grabbing touch-none"
+                  style={{ left: `${c.x}%`, top: `${c.y}%` }}
+                />
+              ))}
+            </div>
           ) : capturedImage ? (
             <img src={capturedImage} alt="Captured cover" className="w-full h-full object-cover" />
           ) : (
@@ -220,7 +313,27 @@ export const CoverScanModal: React.FC<CoverScanModalProps> = ({ isOpen, onClose,
         </div>
 
         <div className="p-4 bg-zinc-950/80 border-t border-zinc-800 space-y-3">
-          {capturedImage ? (
+          {capturedImage && isCropMode ? (
+            <div className="flex items-center justify-between gap-3">
+              <button
+                onClick={() => {
+                  setIsCropMode(false);
+                  setCorners(DEFAULT_CORNERS);
+                }}
+                className="px-3 py-2 text-xs font-medium text-zinc-300 hover:text-amber-400 bg-zinc-800 hover:bg-zinc-700 rounded-lg flex items-center gap-2 transition"
+              >
+                <span>Cancel</span>
+              </button>
+              <span className="text-[11px] text-zinc-400">Drag the corners to match the cover's edges</span>
+              <button
+                onClick={handleApplyCrop}
+                className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-amber-500/20 transition"
+              >
+                <Crop className="w-5 h-5" />
+                <span>Apply Crop</span>
+              </button>
+            </div>
+          ) : capturedImage ? (
             <div className="flex items-center justify-between gap-3">
               <button
                 onClick={handleRetake}
@@ -228,6 +341,13 @@ export const CoverScanModal: React.FC<CoverScanModalProps> = ({ isOpen, onClose,
               >
                 <RotateCcw className="w-4 h-4" />
                 <span>Retake</span>
+              </button>
+              <button
+                onClick={() => setIsCropMode(true)}
+                className="px-3 py-2 text-xs font-medium text-zinc-300 hover:text-amber-400 bg-zinc-800 hover:bg-zinc-700 rounded-lg flex items-center gap-2 transition"
+              >
+                <Crop className="w-4 h-4" />
+                <span>Adjust Corners</span>
               </button>
               <button
                 onClick={handleUsePhoto}
