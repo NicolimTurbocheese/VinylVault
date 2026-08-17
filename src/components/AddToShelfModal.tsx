@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, Save, DollarSign, MapPin, Bookmark, BookmarkPlus, Award, Tag, TrendingUp, TrendingDown, Package, Plus, Calendar, RefreshCw, Settings2, Sparkles, History } from "lucide-react";
+import { X, Save, DollarSign, MapPin, Bookmark, BookmarkPlus, Award, Tag, TrendingUp, TrendingDown, Package, Plus, Calendar, RefreshCw, Settings2, Sparkles, History, ListMusic } from "lucide-react";
 import { RecordScanResult, GoldmineGrade, GOLDMINE_GRADES, ShelfItem, ObiCondition, PackageInclusions, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { calculateAdjustedValuation, calculateCompleteValuation } from "../utils/valuation";
 import { cleanFormatSpec } from "../utils/format";
@@ -61,6 +61,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
   const [isSubgenreManagerOpen, setIsSubgenreManagerOpen] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isTracklistOpen, setIsTracklistOpen] = useState(false);
   const [proposedValuation, setProposedValuation] = useState<{
     median: number;
     low: number;
@@ -371,6 +372,34 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Tracklist */}
+          {activeRecord.tracklist && activeRecord.tracklist.length > 0 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setIsTracklistOpen((prev) => !prev)}
+                className="text-[10px] font-sans uppercase tracking-wider text-[#A94A42] font-bold mb-1 flex items-center gap-1.5 cursor-pointer"
+              >
+                <ListMusic className="w-3.5 h-3.5" />
+                <span>Tracklist ({activeRecord.tracklist.length})</span>
+                <span className="text-[#6B655B] normal-case font-normal">{isTracklistOpen ? "▲" : "▼"}</span>
+              </button>
+              {isTracklistOpen && (
+                <div className="p-3 rounded-lg bg-[#EFEAE0] border border-[#D8D0C0] space-y-1.5 max-h-52 overflow-y-auto font-sans">
+                  {activeRecord.tracklist.map((track, idx) => (
+                    <div key={idx} className="flex items-start justify-between text-xs text-[#2B2B2B] py-1 border-b border-[#D8D0C0]/60 last:border-b-0">
+                      <div className="flex items-start gap-2 min-w-0 flex-1 pr-2">
+                        <span className="text-[#A94A42] font-bold w-7 shrink-0">{track.position}</span>
+                        <span className="break-words">{track.title}</span>
+                      </div>
+                      {track.duration && <span className="text-[#6B655B] text-[11px] shrink-0">{track.duration}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Genre & Sub-Genre Categorization (editable) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

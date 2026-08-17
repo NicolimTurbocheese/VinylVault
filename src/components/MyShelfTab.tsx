@@ -26,7 +26,9 @@ import {
   FileText,
   X,
   Shuffle,
-  CheckSquare
+  CheckSquare,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { ShelfItem, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { exportToCSV, exportToJSON } from "../utils/valuation";
@@ -258,6 +260,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [sortBy, setSortBy] = useState<"value-desc" | "value-asc" | "title" | "year" | "added">("value-desc");
   const [viewMode, setViewMode] = useState<"grid" | "coverflow">("grid");
+  const [cardDensity, setCardDensity] = useState<"detailed" | "compact">("detailed");
   const [itemToDelete, setItemToDelete] = useState<ShelfItem | null>(null);
 
   const anyModalOpen = !!itemToDelete || isClearAllConfirmOpen || isRecalcConfirmOpen || !!duplicateGroups || !!randomPick || isBulkDeleteConfirmOpen;
@@ -572,6 +575,17 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
               <span>Coverflow</span>
             </button>
           </div>
+
+          {viewMode === "grid" && shelfItems.length > 0 && (
+            <button
+              onClick={() => setCardDensity((prev) => (prev === "detailed" ? "compact" : "detailed"))}
+              title={cardDensity === "detailed" ? "Switch to compact view" : "Switch to detailed view"}
+              className="px-2.5 py-1.5 rounded-md border border-[#D8D0C0] bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
+            >
+              {cardDensity === "detailed" ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+              <span>{cardDensity === "detailed" ? "Detailed" : "Compact"}</span>
+            </button>
+          )}
 
           {shelfItems.length > 0 && (
             <button
@@ -990,26 +1004,30 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                       {item.albumTitle}
                     </h3>
                     <p className="text-xs font-serif text-[#A94A42] truncate font-medium">{item.artist}</p>
-                    <p className="text-[10px] font-sans text-[#6B655B] mt-1 break-words">
-                      {item.label} ({item.country || "US"}, {item.releaseYear}) {item.format ? `• ${cleanFormatSpec(item.format)}` : ""}
-                    </p>
+                    {cardDensity === "detailed" && (
+                      <>
+                        <p className="text-[10px] font-sans text-[#6B655B] mt-1 break-words">
+                          {item.label} ({item.country || "US"}, {item.releaseYear}) {item.format ? `• ${cleanFormatSpec(item.format)}` : ""}
+                        </p>
 
-                    {/* Two-Tiered Genre & Styles Tags */}
-                    {(() => {
-                      const normG = normalizeDiscogsGenre(item.genre, item.styles);
-                      return (
-                        <div className="flex flex-wrap items-center gap-1 mt-2">
-                          <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#A94A42]/10 border border-[#A94A42]/20 text-[#A94A42]">
-                            {normG.genre}
-                          </span>
-                          {normG.styles.map((style, sIdx) => (
-                            <span key={sIdx} className="text-[9px] font-sans px-2 py-0.5 rounded-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B]">
-                              {style}
-                            </span>
-                          ))}
-                        </div>
-                      );
-                    })()}
+                        {/* Two-Tiered Genre & Styles Tags */}
+                        {(() => {
+                          const normG = normalizeDiscogsGenre(item.genre, item.styles);
+                          return (
+                            <div className="flex flex-wrap items-center gap-1 mt-2">
+                              <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#A94A42]/10 border border-[#A94A42]/20 text-[#A94A42]">
+                                {normG.genre}
+                              </span>
+                              {normG.styles.map((style, sIdx) => (
+                                <span key={sIdx} className="text-[9px] font-sans px-2 py-0.5 rounded-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B]">
+                                  {style}
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -1032,7 +1050,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                 </div>
 
                 {/* Physical Package Inclusions Badges */}
-                {item.packageInclusions && Object.values(item.packageInclusions).some(Boolean) && (
+                {cardDensity === "detailed" && item.packageInclusions && Object.values(item.packageInclusions).some(Boolean) && (
                   <div className="flex flex-wrap gap-1 font-sans">
                     {item.packageInclusions.lyricsInsert && (
                       <span className="text-[9px] px-2 py-0.5 rounded-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B]">
@@ -1063,31 +1081,33 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                 )}
 
                 {/* Custom Notes & Shelf Details */}
-                <div className="space-y-1.5 text-xs text-[#6B655B] pt-1 font-sans">
-                  {item.boxId && item.boxId !== UNCATEGORISED_BOX_ID && boxes.some((b) => b.id === item.boxId) && (
-                    <div className="flex items-center gap-1.5 text-[#2B2B2B]">
-                      <Package className="w-3.5 h-3.5 text-[#A94A42]" />
-                      <span>Box: {boxes.find((b) => b.id === item.boxId)?.name}</span>
-                    </div>
-                  )}
+                {cardDensity === "detailed" && (
+                  <div className="space-y-1.5 text-xs text-[#6B655B] pt-1 font-sans">
+                    {item.boxId && item.boxId !== UNCATEGORISED_BOX_ID && boxes.some((b) => b.id === item.boxId) && (
+                      <div className="flex items-center gap-1.5 text-[#2B2B2B]">
+                        <Package className="w-3.5 h-3.5 text-[#A94A42]" />
+                        <span>Box: {boxes.find((b) => b.id === item.boxId)?.name}</span>
+                      </div>
+                    )}
 
-                  {item.purchasePrice !== undefined && (
-                    <div className="flex items-center gap-1.5 text-[#6B655B]">
-                      <span>Cost: S${item.purchasePrice}</span>
-                      {(item.acquisitionTransactionType || item.acquisitionCountry) && (
-                        <span className="opacity-75">
-                          ({[item.acquisitionTransactionType, item.acquisitionCountry].filter(Boolean).join(", ")})
-                        </span>
-                      )}
-                    </div>
-                  )}
+                    {item.purchasePrice !== undefined && (
+                      <div className="flex items-center gap-1.5 text-[#6B655B]">
+                        <span>Cost: S${item.purchasePrice}</span>
+                        {(item.acquisitionTransactionType || item.acquisitionCountry) && (
+                          <span className="opacity-75">
+                            ({[item.acquisitionTransactionType, item.acquisitionCountry].filter(Boolean).join(", ")})
+                          </span>
+                        )}
+                      </div>
+                    )}
 
-                  {item.customNotes && (
-                    <p className="p-2.5 rounded-md bg-[#EFEAE0] border border-[#D8D0C0] text-[11px] text-[#2B2B2B] italic line-clamp-2 mt-1 font-sans">
-                      "{item.customNotes}"
-                    </p>
-                  )}
-                </div>
+                    {item.customNotes && (
+                      <p className="p-2.5 rounded-md bg-[#EFEAE0] border border-[#D8D0C0] text-[11px] text-[#2B2B2B] italic line-clamp-2 mt-1 font-sans">
+                        "{item.customNotes}"
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Card Footer Actions */}
