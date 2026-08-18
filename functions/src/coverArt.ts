@@ -35,11 +35,15 @@ export const coverArt = onRequest(
       // Discogs/iTunes/MusicBrainz listings never contain verbatim ("Grease (Original
       // Motion Picture Soundtrack)") — without stripping these, the substring match
       // never fires even though it's obviously the same album.
+      // A stray double space in a manually-logged title (e.g. "The  Weatherman") breaks
+      // the substring match completely against the real single-spaced title, in both
+      // directions — collapse runs of whitespace before anything else.
       const cleanTitle = albumTitle
         .replace(/\s*\([^)]*\)/g, "")
         .replace(/\s*[-–—:]\s*(the\s+)?(original\s+)?(motion\s+picture\s+)?(soundtrack|ost)\s*$/i, "")
+        .replace(/\s+/g, " ")
         .trim();
-      const mainKeyword = (cleanTitle.length >= 3 ? cleanTitle : albumTitle).toLowerCase();
+      const mainKeyword = (cleanTitle.length >= 3 ? cleanTitle : albumTitle).toLowerCase().replace(/\s+/g, " ").trim();
 
       // Check if artist is generic — also true when the ALBUM TITLE itself flags it as a
       // soundtrack/OST even though a specific collaborator's name was logged as the
@@ -67,6 +71,16 @@ export const coverArt = onRequest(
       // exact number, so searching the joined string verbatim reliably returns nothing.
       // Use just the first number in the run for the indexed search.
       const primaryCatNo = (v: string) => v.split(/[,/]/)[0].trim();
+
+      // Other multi-disc box sets shorten the pairing with a trailing hyphen suffix
+      // instead ("AB-7045-6" for AB-7045 + AB-7046, "30AC 227-8" for 30AC 227 + 30AC
+      // 228) rather than a comma/slash. That's indistinguishable from an ordinary
+      // hyphenated catalogue number by pattern alone, so it's tried only as a fallback
+      // if searching the literal string finds nothing — never assumed up front.
+      const strippedSuffixCatNo = (v: string) => {
+        const m = v.match(/^(.+)-(\d{1,2})$/);
+        return m ? m[1].trim() : null;
+      };
 
       // 1. Query Discogs API by Catalogue Number, Matrix/Runout Code, or Clean Title.
       // Catalogue number is the strongest signal (Discogs' catno= field is indexed
@@ -104,6 +118,18 @@ export const coverArt = onRequest(
           const fallbackQuery = discogsQuery.replace("&format=Vinyl", "");
           dRes = await fetch(fallbackQuery, { headers: discogsHeaders });
           dJson = dRes.ok ? await dRes.json() : null;
+        }
+        // Still nothing on a catno-keyed search? Try stripping a trailing hyphen-suffix
+        // (the "AB-7045-6" / "30AC 227-8" style multi-disc shorthand) as a last resort.
+        if (!dJson?.results?.length && usedCatNoSearch) {
+          const stripped = strippedSuffixCatNo(primaryCatNo(catalogueNumber));
+          if (stripped) {
+            dRes = await fetch(
+              `https://api.discogs.com/database/search?catno=${encodeURIComponent(stripped)}&type=release`,
+              { headers: discogsHeaders }
+            );
+            dJson = dRes.ok ? await dRes.json() : null;
+          }
         }
         if (dRes.ok) {
           if (dJson.results && dJson.results.length > 0) {
@@ -285,11 +311,21 @@ export const coverArt = onRequest(
           const mbq = usedMbCatNoSearch
             ? `catno:${primaryCatNo(catalogueNumber)}`
             : `release:"${cleanTitle}" AND artist:"${cleanArtist || 'Various Artists'}"`;
-          const mbRes = await fetch(`https://musicbrainz.org/ws/2/release/?query=${encodeURIComponent(mbq)}&fmt=json`, {
+          let mbRes = await fetch(`https://musicbrainz.org/ws/2/release/?query=${encodeURIComponent(mbq)}&fmt=json`, {
             headers: { "User-Agent": "VinylVault/1.0 (contact@vinylvault.app)" }
           });
+          let mbJson: any = mbRes.ok ? await mbRes.json() : null;
+          // Same hyphen-suffix multi-disc shorthand fallback as the Discogs tier above.
+          if (!mbJson?.releases?.length && usedMbCatNoSearch) {
+            const stripped = strippedSuffixCatNo(primaryCatNo(catalogueNumber));
+            if (stripped) {
+              mbRes = await fetch(`https://musicbrainz.org/ws/2/release/?query=${encodeURIComponent(`catno:${stripped}`)}&fmt=json`, {
+                headers: { "User-Agent": "VinylVault/1.0 (contact@vinylvault.app)" }
+              });
+              mbJson = mbRes.ok ? await mbRes.json() : null;
+            }
+          }
           if (mbRes.ok) {
-            const mbJson: any = await mbRes.json();
             if (mbJson.releases && mbJson.releases.length > 0) {
               // Same reasoning as the Discogs tier: an exact catno-keyed query already
               // proves the release is right, so don't let a nickname/abbreviated stored
