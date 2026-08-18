@@ -9,6 +9,8 @@ import { getStoredSubgenres, saveSubgenresToLocal } from "../utils/subgenres";
 import { apiUrl } from "../utils/apiBase";
 import { RecordCoverImage } from "./RecordCoverImage";
 import { SubgenreManagerModal } from "./SubgenreManagerModal";
+import { GradingWizardModal } from "./GradingWizardModal";
+import { WizardMode } from "../utils/gradingWizard";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 
@@ -61,6 +63,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
   const [purchaseDate, setPurchaseDate] = useState<string>(todayIso());
   const [subgenreLibrary, setSubgenreLibrary] = useState<string[]>(() => getStoredSubgenres());
   const [isSubgenreManagerOpen, setIsSubgenreManagerOpen] = useState(false);
+  const [wizardMode, setWizardMode] = useState<WizardMode | null>(null);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isTracklistOpen, setIsTracklistOpen] = useState(false);
@@ -520,9 +523,19 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
           {/* Condition Grading Selectors */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-sans">
             <div>
-              <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center gap-1.5">
-                <Award className="w-3.5 h-3.5 text-[#A94A42]" />
-                Media Grade
+              <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center justify-between gap-1.5">
+                <span className="flex items-center gap-1.5">
+                  <Award className="w-3.5 h-3.5 text-[#A94A42]" />
+                  Media Grade
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setWizardMode("media")}
+                  title="Not sure? Answer a few questions to get a suggested grade"
+                  className="text-[9px] normal-case font-bold text-[#6B655B] hover:text-[#A94A42] flex items-center gap-0.5 cursor-pointer"
+                >
+                  <Sparkles className="w-3 h-3" /> Wizard
+                </button>
               </label>
               <select
                 value={mediaGrade}
@@ -536,9 +549,19 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
             </div>
 
             <div>
-              <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center gap-1.5">
-                <Award className="w-3.5 h-3.5 text-[#A94A42]" />
-                Sleeve Grade
+              <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center justify-between gap-1.5">
+                <span className="flex items-center gap-1.5">
+                  <Award className="w-3.5 h-3.5 text-[#A94A42]" />
+                  Sleeve Grade
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setWizardMode("sleeve")}
+                  title="Not sure? Answer a few questions to get a suggested grade"
+                  className="text-[9px] normal-case font-bold text-[#6B655B] hover:text-[#A94A42] flex items-center gap-0.5 cursor-pointer"
+                >
+                  <Sparkles className="w-3 h-3" /> Wizard
+                </button>
               </label>
               <select
                 value={sleeveGrade}
@@ -865,6 +888,16 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
           setSubgenreLibrary(updated);
           saveSubgenresToLocal(updated);
           setStyles((prev) => prev.filter((s) => updated.some((u) => u.toLowerCase() === s.toLowerCase())));
+        }}
+      />
+
+      <GradingWizardModal
+        isOpen={wizardMode !== null}
+        mode={wizardMode || "media"}
+        onClose={() => setWizardMode(null)}
+        onApply={(grade) => {
+          if (wizardMode === "media") setMediaGrade(grade);
+          else if (wizardMode === "sleeve") setSleeveGrade(grade);
         }}
       />
     </div>

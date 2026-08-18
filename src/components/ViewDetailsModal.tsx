@@ -6,6 +6,7 @@ import { normalizeDiscogsGenre } from "../utils/genre";
 import { RecordCoverImage } from "./RecordCoverImage";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
+import { useCurrency } from "../context/CurrencyContext";
 
 interface ViewDetailsModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ const gradeLabel = (g?: string) => (g === "F_P" ? "F/P" : g || "N/A");
 export const ViewDetailsModal: React.FC<ViewDetailsModalProps> = ({ isOpen, onClose, item, boxes, onEdit }) => {
   useEscapeToClose(isOpen, onClose);
   useBodyScrollLock(isOpen);
+  const { format } = useCurrency();
 
   if (!isOpen || !item) return null;
 
@@ -121,12 +123,12 @@ export const ViewDetailsModal: React.FC<ViewDetailsModalProps> = ({ isOpen, onCl
               <span className="text-[9px] font-bold uppercase tracking-wider text-[#A94A42] block mb-1 flex items-center gap-1">
                 <DollarSign className="w-3 h-3" /> Est. Value
               </span>
-              <span className="text-lg font-serif font-bold text-[#A94A42]">S${(item.calculatedValue?.median || 0).toFixed(2)}</span>
+              <span className="text-lg font-serif font-bold text-[#A94A42]">{format(item.calculatedValue?.median || 0)}</span>
             </div>
             <div className="p-3.5 rounded-lg bg-[#EFEAE0] border border-[#D8D0C0]">
               <span className="text-[9px] font-bold uppercase tracking-wider text-[#A94A42] block mb-1">Purchase Price</span>
               <span className="text-lg font-serif font-bold text-[#A94A42]">
-                {item.purchasePrice != null ? `S$${item.purchasePrice.toFixed(2)}` : "N/A"}
+                {item.purchasePrice != null ? format(item.purchasePrice) : "N/A"}
               </span>
             </div>
             <div className="p-3.5 rounded-lg bg-[#EFEAE0] border border-[#D8D0C0]">
@@ -203,7 +205,7 @@ export const ViewDetailsModal: React.FC<ViewDetailsModalProps> = ({ isOpen, onCl
                       {gradeLabel(h.mediaGrade)} / {gradeLabel(h.sleeveGrade)}
                       {h.obiCondition && h.obiCondition !== "N/A" ? ` / OBI ${gradeLabel(h.obiCondition)}` : ""}
                     </span>
-                    <span className="font-bold text-[#A94A42]">S${h.calculatedValue.median.toFixed(2)}</span>
+                    <span className="font-bold text-[#A94A42]">{format(h.calculatedValue.median)}</span>
                   </div>
                 ))}
               </div>

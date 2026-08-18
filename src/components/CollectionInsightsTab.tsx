@@ -30,6 +30,8 @@ import {
 import { ShelfItem } from "../types";
 import { useCountUp } from "../hooks/useCountUp";
 import { getStoredSnapshots } from "../utils/valueSnapshots";
+import { useCurrency } from "../context/CurrencyContext";
+import { convertFromSGD, formatConvertedAmount } from "../utils/currency";
 
 interface CollectionInsightsTabProps {
   shelfItems: ShelfItem[];
@@ -43,6 +45,9 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
   // Portfolio totals computed unconditionally (even when empty, reduce()
   // just yields 0) so the count-up hooks below can be called before any
   // early return, keeping hook order stable across renders.
+  const { currency, format } = useCurrency();
+  const conv = (n: number) => convertFromSGD(n, currency);
+
   const totalCount = shelfItems.length;
   const totalLow = shelfItems.reduce((sum, item) => sum + (item.calculatedValue?.low || 0), 0);
   const totalMedian = shelfItems.reduce((sum, item) => sum + (item.calculatedValue?.median || 0), 0);
@@ -82,9 +87,9 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
 
   // 2. Data for Valuation Range Chart
   const valuationBarData = [
-    { name: "Low Est.", Value: totalLow },
-    { name: "Median Value", Value: totalMedian },
-    { name: "High Est.", Value: totalHigh },
+    { name: "Low Est.", Value: conv(totalLow) },
+    { name: "Median Value", Value: conv(totalMedian) },
+    { name: "High Est.", Value: conv(totalHigh) },
   ];
 
   // 3. Data for Genre & Style Distribution
@@ -133,7 +138,7 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
   const valueOverTimeData = usingRealSnapshots
     ? monthlySnapshots.map((s) => ({
         date: new Date(s.date).toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
-        value: s.totalMedian,
+        value: conv(s.totalMedian),
       }))
     : (() => {
         const dated = shelfItems
@@ -160,7 +165,7 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
               running += dayValue;
               return {
                 date: new Date(dayKey).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" }),
-                value: running,
+                value: conv(running),
               };
             });
         }
@@ -170,7 +175,7 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
           running += item.calculatedValue?.median || 0;
           return {
             date: new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" }),
-            value: running,
+            value: conv(running),
           };
         });
       })();
@@ -194,10 +199,10 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
             Portfolio Total Value
           </span>
           <div className="text-4xl font-serif font-bold text-[#FFBF00] mt-1.5 tabular-nums">
-            S${animatedTotalMedian.toLocaleString()}
+            {format(animatedTotalMedian)}
           </div>
           <span className="text-[10px] font-mono text-zinc-500 block mt-1.5">
-            Est: S${totalLow.toLocaleString()} - S${totalHigh.toLocaleString()}
+            Est: {format(totalLow)} - {format(totalHigh)}
           </span>
         </div>
 
@@ -206,7 +211,7 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
             Average Value / Album
           </span>
           <div className="text-2xl font-serif font-bold text-white mt-1 tabular-nums">
-            S${animatedAvgValue}
+            {format(animatedAvgValue)}
           </div>
           <span className="text-[10px] font-mono text-[#D4AF37] block mt-1">
             Across {totalCount} Catalogued Albums
@@ -218,7 +223,7 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
             Logged Purchase Cost
           </span>
           <div className="text-2xl font-serif font-bold text-zinc-300 mt-1 tabular-nums">
-            S${animatedInvestment.toLocaleString()}
+            {format(animatedInvestment)}
           </div>
           <span className="text-[10px] font-mono text-zinc-500 block mt-1">
             {itemsWithPrice.length} items logged
@@ -236,7 +241,7 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
             </span>
           </div>
           <div className={`text-3xl font-serif font-bold tabular-nums ${netGain >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-            {netGain >= 0 ? `+S$${animatedNetGain.toLocaleString()}` : `-S$${Math.abs(animatedNetGain).toLocaleString()}`}
+            {netGain >= 0 ? `+${format(animatedNetGain)}` : `-${format(Math.abs(animatedNetGain))}`}
           </div>
         </div>
       </div>
@@ -250,7 +255,7 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
               <BarChart3 className="w-5 h-5 text-[#D4AF37]" />
               <h3 className="font-serif font-bold text-white text-base">Valuation Spread (Low / Median / High)</h3>
             </div>
-            <span className="text-xs font-mono text-[#D4AF37]">S${totalMedian} Total</span>
+            <span className="text-xs font-mono text-[#D4AF37]">{format(totalMedian)} Total</span>
           </div>
 
           <div className="h-64 w-full pt-4">
@@ -260,7 +265,7 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
                 <YAxis stroke="#888888" fontSize={11} fontFamily="JetBrains Mono" />
                 <Tooltip
                   contentStyle={{ backgroundColor: "#0C0C0C", borderColor: "#D4AF37", borderRadius: "4px", color: "#FFBF00", fontFamily: "JetBrains Mono" }}
-                  formatter={(val: number) => [`S$${val.toLocaleString()}`, "Valuation"]}
+                  formatter={(val: number) => [formatConvertedAmount(val, currency), "Valuation"]}
                 />
                 <Bar dataKey="Value" fill="#D4AF37" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -330,7 +335,7 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
                 <YAxis stroke="#888888" fontSize={11} fontFamily="JetBrains Mono" />
                 <Tooltip
                   contentStyle={{ backgroundColor: "#0C0C0C", borderColor: "#D4AF37", borderRadius: "4px", color: "#FFBF00", fontFamily: "JetBrains Mono" }}
-                  formatter={(val: number) => [`S$${val.toLocaleString()}`, "Cumulative Value"]}
+                  formatter={(val: number) => [formatConvertedAmount(val, currency), "Cumulative Value"]}
                 />
                 <Line type="monotone" dataKey="value" stroke="#D4AF37" strokeWidth={2} dot={false} />
               </LineChart>
@@ -379,7 +384,7 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
 
               <div className="text-right flex-shrink-0 font-mono">
                 <div className="text-base font-serif font-bold text-[#FFBF00]">
-                  S${item.calculatedValue?.median}
+                  {format(item.calculatedValue?.median || 0)}
                 </div>
                 <div className="text-[10px] text-zinc-500">
                   Grade: {item.mediaGrade} / {item.sleeveGrade}

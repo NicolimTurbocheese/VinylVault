@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Heart, Plus, Trash2, ArrowRight, DollarSign } from "lucide-react";
 import { WantlistItem, WantlistPriority, ShelfItem } from "../types";
+import { useCurrency } from "../context/CurrencyContext";
 
 interface WantlistTabProps {
   wantlist: WantlistItem[];
@@ -16,6 +17,7 @@ const PRIORITY_STYLES: Record<WantlistPriority, string> = {
 };
 
 export const WantlistTab: React.FC<WantlistTabProps> = ({ wantlist, onAddItem, onDeleteItem, onMoveToShelf }) => {
+  const { format } = useCurrency();
   const [artist, setArtist] = useState("");
   const [albumTitle, setAlbumTitle] = useState("");
   const [notes, setNotes] = useState("");
@@ -132,7 +134,7 @@ export const WantlistTab: React.FC<WantlistTabProps> = ({ wantlist, onAddItem, o
                 <p className="text-xs text-[#A94A42] font-medium truncate">{item.artist}</p>
                 {(item.notes || item.targetPriceSGD) && (
                   <p className="text-[11px] text-[#6B655B] mt-0.5 truncate">
-                    {item.targetPriceSGD ? `Target: S$${item.targetPriceSGD.toFixed(2)}` : ""}
+                    {item.targetPriceSGD ? `Target: ${format(item.targetPriceSGD)}` : ""}
                     {item.notes && item.targetPriceSGD ? " · " : ""}
                     {item.notes || ""}
                   </p>

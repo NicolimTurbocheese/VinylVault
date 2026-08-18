@@ -1,6 +1,8 @@
 import React from "react";
 import { Search, Library, BarChart3, Disc3, Cloud, CloudOff, Package, Palette, Heart } from "lucide-react";
 import { useIsScrollLocked } from "../hooks/useIsScrollLocked";
+import { useCurrency } from "../context/CurrencyContext";
+import { SUPPORTED_CURRENCIES } from "../utils/currency";
 
 interface HeaderProps {
   activeTab: "scan" | "shelf" | "insights" | "organise" | "wantlist";
@@ -26,6 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
   // body is a known source of wheel/trackpad scroll events routing to the wrong
   // element instead of the modal's own scrollable content.
   const isScrollLocked = useIsScrollLocked();
+  const { currency, setCurrency } = useCurrency();
   if (isScrollLocked) return null;
 
   return (
@@ -153,6 +156,19 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Palette className="w-3.5 h-3.5" />
             </button>
+
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value as typeof currency)}
+              title="Display currency (values are stored in SGD; this only converts what's shown, at a fixed approximate rate)"
+              className="p-1.5 sm:px-2 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-sans font-bold text-[#6B655B] border border-transparent hover:text-[#A94A42] hover:bg-[#E2DCD0]/30 bg-transparent transition-all cursor-pointer focus:outline-none"
+            >
+              {SUPPORTED_CURRENCIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
 
             <button
               onClick={onOpenCommandPalette}

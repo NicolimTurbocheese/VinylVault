@@ -44,6 +44,7 @@ import { ViewDetailsModal } from "./ViewDetailsModal";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { useCountUp } from "../hooks/useCountUp";
+import { useCurrency } from "../context/CurrencyContext";
 
 interface MyShelfTabProps {
   shelfItems: ShelfItem[];
@@ -68,6 +69,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   onQuickUpdateItem,
   onClearAllItems,
 }) => {
+  const { format } = useCurrency();
   const [isClearAllConfirmOpen, setIsClearAllConfirmOpen] = useState(false);
   const [clearAllConfirmText, setClearAllConfirmText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -502,10 +504,10 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
               Total Collection Value
             </span>
             <div className="text-3xl font-serif font-bold text-[#2B2B2B] mt-1 tabular-nums">
-              S${animatedValueMedian.toLocaleString()}
+              {format(animatedValueMedian)}
             </div>
             <span className="text-[10px] font-sans text-[#6B655B]">
-              Est. Range: S${totalValueLow.toLocaleString()} - S${totalValueHigh.toLocaleString()}
+              Est. Range: {format(totalValueLow)} - {format(totalValueHigh)}
             </span>
           </div>
           <div className="p-3 rounded-full bg-[#A94A42]/10 text-[#A94A42] border border-[#A94A42]/20">
@@ -526,7 +528,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                   {mostValuable.albumTitle}
                 </div>
                 <div className="text-xs font-sans text-[#A94A42] font-bold mt-0.5">
-                  S${mostValuable.calculatedValue.median} ({mostValuable.mediaGrade} / {mostValuable.sleeveGrade})
+                  {format(mostValuable.calculatedValue.median)} ({mostValuable.mediaGrade} / {mostValuable.sleeveGrade})
                 </div>
               </div>
             ) : (
@@ -1161,7 +1163,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                   <div className="text-right ml-auto">
                     <span className="text-[9px] text-[#6B655B] block uppercase tracking-wider font-bold">Est. Value</span>
                     <span className="text-base font-serif font-bold text-[#A94A42]">
-                      S${item.calculatedValue?.median || 0}
+                      {format(item.calculatedValue?.median || 0)}
                     </span>
                   </div>
                 </div>
@@ -1227,7 +1229,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
 
                     {item.purchasePrice !== undefined && (
                       <div className="flex items-center gap-1.5 text-[#6B655B]">
-                        <span>Cost: S${item.purchasePrice}</span>
+                        <span>Cost: {format(item.purchasePrice || 0)}</span>
                         {(item.acquisitionTransactionType || item.acquisitionCountry) && (
                           <span className="opacity-75">
                             ({[item.acquisitionTransactionType, item.acquisitionCountry].filter(Boolean).join(", ")})
@@ -1452,7 +1454,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                     <div className="space-y-1">
                       {group.items.map((it) => (
                         <div key={it.id} className="text-[11px] text-[#6B655B]">
-                          Cat#: {it.catalogueNumber || "(none)"} · {it.releaseYear || "?"} · {it.label || "?"} · S${it.calculatedValue?.median?.toFixed(0) ?? "0"}
+                          Cat#: {it.catalogueNumber || "(none)"} · {it.releaseYear || "?"} · {it.label || "?"} · {format(it.calculatedValue?.median || 0)}
                         </div>
                       ))}
                     </div>
