@@ -29,7 +29,8 @@ import {
   CheckSquare,
   Eye,
   EyeOff,
-  ListMusic
+  ListMusic,
+  ClipboardCheck
 } from "lucide-react";
 import { ShelfItem, VinylBox, UNCATEGORISED_BOX_ID } from "../types";
 import { exportToCSV, exportToJSON } from "../utils/valuation";
@@ -41,6 +42,7 @@ import { findDuplicateGroups, DuplicateGroup } from "../utils/duplicateCheck";
 import { RecordCoverImage } from "./RecordCoverImage";
 import { CoverflowCarousel } from "./CoverflowCarousel";
 import { ViewDetailsModal } from "./ViewDetailsModal";
+import { DataAuditModal } from "./DataAuditModal";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { useCountUp } from "../hooks/useCountUp";
@@ -96,6 +98,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
 
   const missingCoverItems = shelfItems.filter((i) => !i.coverArtUrl);
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[] | null>(null);
+  const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [randomPick, setRandomPick] = useState<ShelfItem | null>(null);
   const [randomPickGenre, setRandomPickGenre] = useState<string>("");
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -858,6 +861,18 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                 >
                   <Layers className="w-3.5 h-3.5 text-[#6B655B]" />
                   <span>Check for Duplicates</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    setIsAuditOpen(true);
+                  }}
+                  disabled={shelfItems.length === 0}
+                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ClipboardCheck className="w-3.5 h-3.5 text-[#6B655B]" />
+                  <span>Data Audit (What's Missing)</span>
                 </button>
 
                 <div className="my-1.5 border-t border-[#E2DCD0]" />
@@ -1630,6 +1645,15 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
         item={itemToView}
         boxes={boxes}
         onEdit={onEditItem}
+      />
+
+      {/* Like ViewDetailsModal, this owns its own escape-close and body-scroll-lock, so it
+          must NOT also be folded into the shared anyModalOpen state above. */}
+      <DataAuditModal
+        isOpen={isAuditOpen}
+        onClose={() => setIsAuditOpen(false)}
+        shelfItems={shelfItems}
+        onEditItem={onEditItem}
       />
     </div>
   );
