@@ -133,13 +133,27 @@ export const coverArt = onRequest(
         }
         if (dRes.ok) {
           if (dJson.results && dJson.results.length > 0) {
-            for (const r of dJson.results) {
+            // An exact catno match is trusted even without a title/artist match (a real
+            // record logged under a nickname won't textually resemble the official
+            // title) -- but Discogs' catno search isn't a strict unique index, so when
+            // it returns several candidates, still prefer whichever one's title/artist
+            // actually resembles what's on file, rather than blindly taking Discogs'
+            // own ordering. A title-matching result is only ever passed over here if no
+            // candidate matches at all.
+            const textMatches = (r: any) => {
+              const rTitle = (r.title || "").toLowerCase();
+              const matchesTitle = rTitle.includes(mainKeyword);
+              const matchesArtist = !normalizedArtist || normalizeArtistName(rTitle).includes(normalizedArtist);
+              return matchesTitle && matchesArtist;
+            };
+            const orderedResults = usedCatNoSearch
+              ? [...dJson.results].sort((a: any, b: any) => Number(textMatches(b)) - Number(textMatches(a)))
+              : dJson.results;
+            for (const r of orderedResults) {
               const img = r.cover_image || r.thumb;
               if (img && !img.includes("spacer.gif") && !results.includes(img)) {
-                const rTitle = (r.title || "").toLowerCase();
-                const matchesTitle = usedCatNoSearch || rTitle.includes(mainKeyword);
-                const matchesArtist = usedCatNoSearch || !normalizedArtist || normalizeArtistName(rTitle).includes(normalizedArtist);
-                if (matchesTitle && matchesArtist) {
+                const included = usedCatNoSearch || textMatches(r);
+                if (included) {
                   results.push(img);
 
                   // Pull the full release record for this specific pressing — with an
@@ -328,15 +342,20 @@ export const coverArt = onRequest(
           if (mbRes.ok) {
             if (mbJson.releases && mbJson.releases.length > 0) {
               // Same reasoning as the Discogs tier: an exact catno-keyed query already
-              // proves the release is right, so don't let a nickname/abbreviated stored
-              // title reject it via the text filter.
-              const matched = usedMbCatNoSearch ? mbJson.releases : mbJson.releases.filter((rel: any) => {
+              // proves the release is right, so a nickname/abbreviated stored title
+              // doesn't reject it outright -- but MusicBrainz's catno search isn't a
+              // strict unique index either, so when it's still ambiguous, a candidate
+              // whose title/artist textually matches is preferred over the raw order.
+              const mbTextMatches = (rel: any) => {
                 const relTitle = (rel.title || "").toLowerCase();
                 const relArtist = (rel["artist-credit"]?.[0]?.name || "").toLowerCase();
                 const matchesTitle = relTitle.includes(mainKeyword) || mainKeyword.includes(relTitle);
                 const matchesArtist = normalizedArtist ? normalizeArtistName(relArtist).includes(normalizedArtist) : true;
                 return matchesTitle && matchesArtist;
-              });
+              };
+              const matched = usedMbCatNoSearch
+                ? [...mbJson.releases].sort((a: any, b: any) => Number(mbTextMatches(b)) - Number(mbTextMatches(a)))
+                : mbJson.releases.filter(mbTextMatches);
               // Prefer the Vinyl-tagged release when the search returned several
               // pressings/editions — a CD or digital edition with the same title can
               // otherwise outrank the vinyl pressing and hand back a wrong tracklist
