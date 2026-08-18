@@ -141,6 +141,30 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
           .filter((x): x is { item: ShelfItem; dateStr: string } => !!x.dateStr && !isNaN(new Date(x.dateStr).getTime()))
           .sort((a, b) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime());
 
+        // Merge same-day entries into one point — otherwise dozens of records sharing a
+        // single addedAt date (e.g. a bulk import, or anything without a purchaseDate set)
+        // print that same date as an x-axis tick over and over, illegibly. Only fall back
+        // to one point per item in the rare case where merging would collapse everything
+        // down to a single point (nothing to plot a line between).
+        const byDay = new Map<string, number>();
+        for (const { item, dateStr } of dated) {
+          const dayKey = new Date(dateStr).toISOString().slice(0, 10);
+          byDay.set(dayKey, (byDay.get(dayKey) || 0) + (item.calculatedValue?.median || 0));
+        }
+
+        if (byDay.size > 1) {
+          let running = 0;
+          return Array.from(byDay.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([dayKey, dayValue]) => {
+              running += dayValue;
+              return {
+                date: new Date(dayKey).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" }),
+                value: running,
+              };
+            });
+        }
+
         let running = 0;
         return dated.map(({ item, dateStr }) => {
           running += item.calculatedValue?.median || 0;
@@ -296,7 +320,13 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={valueOverTimeData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis dataKey="date" stroke="#888888" fontSize={10} fontFamily="JetBrains Mono" interval="preserveStartEnd" />
+                <XAxis
+                  dataKey="date"
+                  stroke="#888888"
+                  fontSize={10}
+                  fontFamily="JetBrains Mono"
+                  interval={Math.max(0, Math.ceil(valueOverTimeData.length / 8) - 1)}
+                />
                 <YAxis stroke="#888888" fontSize={11} fontFamily="JetBrains Mono" />
                 <Tooltip
                   contentStyle={{ backgroundColor: "#0C0C0C", borderColor: "#D4AF37", borderRadius: "4px", color: "#FFBF00", fontFamily: "JetBrains Mono" }}
