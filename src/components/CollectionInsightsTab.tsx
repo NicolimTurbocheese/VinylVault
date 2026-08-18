@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { normalizeDiscogsGenre } from "../utils/genre";
 import {
   BarChart3,
@@ -47,6 +47,7 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
   // early return, keeping hook order stable across renders.
   const { currency, format } = useCurrency();
   const conv = (n: number) => convertFromSGD(n, currency);
+  const [timeframe, setTimeframe] = useState<"1W" | "1M" | "3M" | "1Y" | "ALL">("1M");
 
   const totalCount = shelfItems.length;
   const totalLow = shelfItems.reduce((sum, item) => sum + (item.calculatedValue?.low || 0), 0);
@@ -127,17 +128,37 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
 
   const COLORS = ["#D4AF37", "#FFBF00", "#997A15", "#B38F24", "#66520E", "#E5C158"];
 
-  // 5. Collection value over time. Real monthly snapshots (recorded automatically once per
-  // calendar month by App.tsx) are the preferred source — an actual measured history of the
-  // collection's total value, not a proxy. Until at least two months of snapshots exist,
-  // fall back to a running total by acquisition date (purchaseDate, or addedAt if that's
-  // missing) so the chart isn't just empty for a brand-new collection.
-  const monthlySnapshots = getStoredSnapshots();
-  const usingRealSnapshots = monthlySnapshots.length > 1;
+  // 5. Collection value over time. Real daily snapshots (recorded automatically once per
+  // day by App.tsx) are the preferred source — an actual measured history of the
+  // collection's total value, not a proxy, and the daily granularity is what makes a real
+  // stock-app-style timeframe toggle (1W/1M/3M/1Y/ALL) meaningful. Until at least two days
+  // of snapshots exist, fall back to a running total by acquisition date (purchaseDate, or
+  // addedAt if that's missing) so the chart isn't just empty for a brand-new collection —
+  // the timeframe toggle has no effect in that fallback mode, since acquisition order isn't
+  // a real timeline to window into.
+  const allSnapshots = getStoredSnapshots();
+  const usingRealSnapshots = allSnapshots.length > 1;
+
+  const TIMEFRAME_DAYS: Record<typeof timeframe, number | null> = { "1W": 7, "1M": 30, "3M": 90, "1Y": 365, ALL: null };
+  const windowedSnapshots = (() => {
+    if (!usingRealSnapshots) return allSnapshots;
+    const days = TIMEFRAME_DAYS[timeframe];
+    if (days === null) return allSnapshots;
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    const filtered = allSnapshots.filter((s) => new Date(s.date).getTime() >= cutoff);
+    // A tight window on a collection with sparse history could filter down to 0-1 points --
+    // show everything available rather than an empty/single-dot chart.
+    return filtered.length > 1 ? filtered : allSnapshots;
+  })();
+
+  const snapshotDateFormat: Intl.DateTimeFormatOptions =
+    timeframe === "1W" || timeframe === "1M"
+      ? { month: "short", day: "numeric" }
+      : { month: "short", year: "2-digit" };
 
   const valueOverTimeData = usingRealSnapshots
-    ? monthlySnapshots.map((s) => ({
-        date: new Date(s.date).toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
+    ? windowedSnapshots.map((s) => ({
+        date: new Date(s.date).toLocaleDateString(undefined, snapshotDateFormat),
         value: conv(s.totalMedian),
       }))
     : (() => {
@@ -312,14 +333,28 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
       {/* Collection Value Over Time */}
       {valueOverTimeData.length > 1 && (
         <div className="p-6 rounded-lg bg-[#161616] border border-[#D4AF37]/20 shadow-2xl space-y-4">
-          <div className="flex items-center justify-between border-b border-white/5 pb-3">
+          <div className="flex items-center justify-between border-b border-white/5 pb-3 flex-wrap gap-3">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-[#D4AF37]" />
               <h3 className="font-serif font-bold text-white text-base">Collection Value Over Time</h3>
             </div>
-            <span className="text-xs font-mono text-zinc-400">
-              {usingRealSnapshots ? "Monthly snapshots" : "By acquisition order (building history)"}
-            </span>
+            {usingRealSnapshots ? (
+              <div className="flex items-center rounded-md border border-white/10 overflow-hidden">
+                {(["1W", "1M", "3M", "1Y", "ALL"] as const).map((tf) => (
+                  <button
+                    key={tf}
+                    onClick={() => setTimeframe(tf)}
+                    className={`px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider transition cursor-pointer ${
+                      timeframe === tf ? "bg-[#D4AF37] text-black" : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    {tf}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className="text-xs font-mono text-zinc-400">By acquisition order (building history)</span>
+            )}
           </div>
           <div className="h-64 w-full pt-4">
             <ResponsiveContainer width="100%" height="100%">

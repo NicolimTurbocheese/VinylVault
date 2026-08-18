@@ -25,13 +25,16 @@ export function saveSnapshotsToLocal(snapshots: ValueSnapshot[]) {
   localStorage.setItem(SNAPSHOTS_STORAGE_KEY, JSON.stringify(snapshots));
 }
 
-const monthKey = (iso: string) => iso.slice(0, 7); // "YYYY-MM"
+const dayKey = (iso: string) => iso.slice(0, 10); // "YYYY-MM-DD"
 
-// Records a new value snapshot once per calendar month — call on every app load. If a
-// snapshot already exists for the current month, updates it in place (so the month's
-// figure reflects the collection's latest state rather than freezing at first-open),
-// otherwise appends a new one. Never records for an empty shelf.
-export function recordMonthlySnapshotIfNeeded(shelfItems: ShelfItem[]): ValueSnapshot[] {
+// Records a new value snapshot once per calendar day — call on every app load. If a
+// snapshot already exists for today, updates it in place (so today's figure reflects the
+// collection's latest state rather than freezing at first-open), otherwise appends a new
+// one. Never records for an empty shelf. Daily (rather than monthly) granularity is what
+// makes a real stock-app-style timeline toggle (1W/1M/3M/1Y) possible — any older monthly
+// snapshots recorded before this change remain valid points in the same series, since the
+// shape is unchanged; the history just gets denser going forward.
+export function recordDailySnapshotIfNeeded(shelfItems: ShelfItem[]): ValueSnapshot[] {
   const snapshots = getStoredSnapshots();
   if (shelfItems.length === 0) return snapshots;
 
@@ -46,8 +49,7 @@ export function recordMonthlySnapshotIfNeeded(shelfItems: ShelfItem[]): ValueSna
   );
 
   const today = new Date().toISOString().slice(0, 10);
-  const currentMonth = monthKey(today);
-  const existingIdx = snapshots.findIndex((s) => monthKey(s.date) === currentMonth);
+  const existingIdx = snapshots.findIndex((s) => dayKey(s.date) === today);
 
   const snapshot: ValueSnapshot = { date: today, ...totals, itemCount: shelfItems.length };
 

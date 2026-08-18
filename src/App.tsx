@@ -18,7 +18,7 @@ import { normalizeDiscogsGenre } from "./utils/genre";
 import { isFirebaseConfigured } from "./utils/firebase";
 import { getStoredBoxes, saveBoxesToLocal, generateBoxId } from "./utils/boxes";
 import { getStoredWantlist, saveWantlistToLocal } from "./utils/wantlist";
-import { recordMonthlySnapshotIfNeeded } from "./utils/valueSnapshots";
+import { recordDailySnapshotIfNeeded } from "./utils/valueSnapshots";
 import {
   getStoredVaultCode,
   storeVaultCode,
@@ -95,12 +95,12 @@ export default function App() {
     localStorage.setItem("vinylvault_theme", currentTheme);
   }, [currentTheme]);
 
-  // Records (or refreshes) this calendar month's total-value snapshot whenever the shelf
-  // changes — this is what powers a real historical Value Over Time chart instead of the
+  // Records (or refreshes) today's total-value snapshot whenever the shelf changes — this
+  // is what powers a real historical, stock-app-style Value Over Time chart instead of the
   // acquisition-order proxy, since the app takes no server-side scheduled snapshots.
   useEffect(() => {
     if (shelfItems.length > 0) {
-      recordMonthlySnapshotIfNeeded(shelfItems);
+      recordDailySnapshotIfNeeded(shelfItems);
     }
   }, [shelfItems]);
 
