@@ -20,10 +20,8 @@ export const ToastStack: React.FC<ToastStackProps> = ({ toasts, onDismiss }) => 
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className={`animate-fade-in pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-lg shadow-lg border text-xs font-sans font-medium ${
-            toast.variant === "success"
-              ? "bg-[#2D4A3E] border-[#8FA89B]/40 text-white"
-              : "bg-[#A94A42] border-[#A94A42]/40 text-white"
+          className={`vv-on-dark animate-fade-in pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-lg shadow-lg border text-xs font-sans font-medium ${
+            toast.variant === "success" ? "vv-toast-success text-white" : "vv-toast-error text-white"
           }`}
         >
           {toast.variant === "success" ? (

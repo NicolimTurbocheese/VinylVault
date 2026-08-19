@@ -194,6 +194,31 @@ header {
   color: var(--vv-text) !important;
 }
 
+/* Escape hatch for components that paint their OWN dark background (toasts, and anything
+   similar added later). The .text-white override above exists to stop white text stranding
+   on a light themed surface, but it can't tell the difference between that and text sitting
+   on a deliberately dark panel — which is how toast messages ended up dark-on-dark-green and
+   unreadable. Marking such a container .vv-on-dark keeps its text white in every theme.
+   Declared after the rule it counters so it wins on source order. */
+.vv-on-dark,
+.vv-on-dark * {
+  color: #FFFFFF !important;
+}
+
+/* Toast backgrounds are pinned rather than themed. Left to the theme layer, the accent
+   remap turned the error toast orange under the nordic theme, which drops white text to a
+   4.23 contrast ratio — under the 4.5 WCAG AA minimum for text this size. These two are
+   chosen to clear AA against white in every theme. */
+.vv-toast-success {
+  background-color: #2D4A3E !important;
+  border-color: rgba(143, 168, 155, 0.4) !important;
+}
+
+.vv-toast-error {
+  background-color: #8E3E37 !important;
+  border-color: rgba(142, 62, 55, 0.5) !important;
+}
+
 .text-\[\#6B655B\],
 .text-zinc-400,
 .text-zinc-500,
