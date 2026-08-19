@@ -419,18 +419,47 @@ export default function App() {
   // untouched. Built for applying research done outside the app (web search results for
   // records the automated cover-art/tracklist fetch couldn't match) without risking any
   // other field on a real, personally-owned record.
-  const handleImportPatch = (patches: Array<Partial<ShelfItem> & { albumTitle: string; artist: string }>) => {
-    const normKey = (title: string, artist: string) => `${title}-${artist}`.toLowerCase().trim();
+  const handleImportPatch = (
+    patches: Array<Partial<ShelfItem> & { albumTitle: string; artist: string }>
+  ) => {
+    // Whitespace and case vary between a generated patch and hand-edited records, so
+    // normalise both sides before comparing.
+    const norm = (s?: string) => (s || "").toLowerCase().replace(/\s+/g, " ").trim();
+    const normKey = (title?: string, artist?: string) => `${norm(title)}-${norm(artist)}`;
+
+    // Catalogue numbers are stable identifiers that survive a title being corrected, so
+    // they act as the fallback when title+artist no longer lines up. Only usable when the
+    // value is unique on the shelf — several records can legitimately share a placeholder
+    // like "Barcode", and matching on that would patch the wrong record.
+    const catCounts = new Map<string, number>();
+    for (const i of shelfItemsRef.current) {
+      const cn = norm(i.catalogueNumber);
+      if (cn) catCounts.set(cn, (catCounts.get(cn) || 0) + 1);
+    }
+
     let applied = 0;
     let notFound = 0;
-    let updated = [...shelfItems];
+    const missed: string[] = [];
+    // Captured before saving, since saveShelfToLocal updates the ref in place and the
+    // vault diff below needs the pre-patch list to compare against.
+    const before = shelfItemsRef.current;
+    let updated = [...before];
 
     for (const patch of patches) {
       if (!patch || !patch.albumTitle || !patch.artist) continue;
       const key = normKey(patch.albumTitle, patch.artist);
-      const idx = updated.findIndex((i) => normKey(i.albumTitle, i.artist) === key);
+      let idx = updated.findIndex((i) => normKey(i.albumTitle, i.artist) === key);
+
+      if (idx === -1) {
+        const cn = norm(patch.catalogueNumber);
+        if (cn && catCounts.get(cn) === 1) {
+          idx = updated.findIndex((i) => norm(i.catalogueNumber) === cn);
+        }
+      }
+
       if (idx === -1) {
         notFound++;
+        if (missed.length < 3) missed.push(`${patch.artist} — ${patch.albumTitle}`);
         continue;
       }
       const { albumTitle, artist, ...fields } = patch;
@@ -443,7 +472,7 @@ export default function App() {
     if (applied === 0) {
       showToast(
         notFound > 0
-          ? `Nothing updated — none of the ${notFound} record(s) in that file matched a title+artist on your shelf.`
+          ? `Nothing updated — none of the ${notFound} record(s) matched. First unmatched: ${missed.join("; ")}`
           : "Nothing updated — the file had no usable fields.",
         "error"
       );
@@ -456,7 +485,7 @@ export default function App() {
     );
 
     if (vaultCode && syncStatus === "connected") {
-      const changed = updated.filter((u, i) => u !== shelfItems[i]);
+      const changed = updated.filter((u, i) => u !== before[i]);
       bulkUpsertVaultDocs(vaultCode, "shelfItems", changed.map(sanitizeShelfItem)).catch((err) => {
         console.error("Failed to sync patched items to vault:", err);
       });
