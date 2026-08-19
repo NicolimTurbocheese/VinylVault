@@ -30,6 +30,7 @@ import {
 import { ShelfItem } from "../types";
 import { useCountUp } from "../hooks/useCountUp";
 import { getStoredSnapshots, buildValueSeries } from "../utils/valueSnapshots";
+import { effectiveValueSGD, getValuationSource, setValuationSource, ValuationSource, isMarketValued } from "../utils/marketData";
 import { useCurrency } from "../context/CurrencyContext";
 import { convertFromSGD, formatConvertedAmount } from "../utils/currency";
 
@@ -48,15 +49,21 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
   const { currency, format } = useCurrency();
   const conv = (n: number) => convertFromSGD(n, currency);
   const [timeframe, setTimeframe] = useState<"1W" | "1M" | "3M" | "1Y" | "ALL">("1M");
+  const [valuationSource, setValuationSourceState] = useState<ValuationSource>(() => getValuationSource());
+  const applyValuationSource = (src: ValuationSource) => {
+    setValuationSource(src);
+    setValuationSourceState(src);
+  };
+  const marketValuedCount = shelfItems.filter((i) => isMarketValued(i, valuationSource)).length;
 
   const totalCount = shelfItems.length;
   const totalLow = shelfItems.reduce((sum, item) => sum + (item.calculatedValue?.low || 0), 0);
-  const totalMedian = shelfItems.reduce((sum, item) => sum + (item.calculatedValue?.median || 0), 0);
+  const totalMedian = shelfItems.reduce((sum, item) => sum + effectiveValueSGD(item), 0);
   const totalHigh = shelfItems.reduce((sum, item) => sum + (item.calculatedValue?.high || 0), 0);
   const totalInvestment = shelfItems.reduce((sum, item) => sum + (item.purchasePrice || 0), 0);
   const itemsWithPrice = shelfItems.filter((i) => i.purchasePrice !== undefined && i.purchasePrice > 0);
   const totalCostKnown = itemsWithPrice.reduce((sum, item) => sum + (item.purchasePrice || 0), 0);
-  const totalValKnown = itemsWithPrice.reduce((sum, item) => sum + (item.calculatedValue?.median || 0), 0);
+  const totalValKnown = itemsWithPrice.reduce((sum, item) => sum + effectiveValueSGD(item), 0);
   const netGain = totalValKnown - totalCostKnown;
   const avgRecordValue = totalCount > 0 ? Math.round(totalMedian / totalCount) : 0;
 
@@ -170,11 +177,45 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
 
   // 5. Top 5 Most Valuable
   const topValuable = [...shelfItems]
-    .sort((a, b) => (b.calculatedValue?.median || 0) - (a.calculatedValue?.median || 0))
+    .sort((a, b) => effectiveValueSGD(b) - effectiveValueSGD(a))
     .slice(0, 5);
 
   return (
     <div className="space-y-8 pb-12">
+      {/* Valuation source — governs every figure on this tab, so it sits above them all. */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400">
+            Valued by
+          </span>
+          <div className="flex items-center rounded-md border border-[#D4AF37]/20 overflow-hidden">
+            {(["market", "estimate"] as const).map((src) => (
+              <button
+                key={src}
+                onClick={() => applyValuationSource(src)}
+                title={
+                  src === "market"
+                    ? "Use the real Discogs price recorded for each record's own condition, falling back to the app's estimate where none exists"
+                    : "Use the app's own valuation engine for every record"
+                }
+                className={`px-3 py-1.5 min-h-11 lg:min-h-0 text-[10px] font-mono font-bold uppercase tracking-wider transition cursor-pointer ${
+                  valuationSource === src ? "bg-[#D4AF37] text-black" : "text-zinc-400 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                {src === "market" ? "Market price" : "App estimate"}
+              </button>
+            ))}
+          </div>
+        </div>
+        {valuationSource === "market" && (
+          <p className="text-[10px] font-mono text-zinc-500">
+            {marketValuedCount > 0
+              ? `${marketValuedCount} of ${shelfItems.length} priced from Discogs · rest use the estimate`
+              : "No market prices recorded yet — run My Shelf → Actions → Fetch Market Prices"}
+          </p>
+        )}
+      </div>
+
       {/* Metric Cards Bento Grid — the portfolio total is the headline number, so it gets
           double width and a rotating gradient border; the gain/loss card runs full width
           along the bottom since it's the second most important read at a glance. */}
@@ -401,7 +442,7 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
 
               <div className="text-right flex-shrink-0 font-mono">
                 <div className="text-base font-serif font-bold text-[#FFBF00]">
-                  {format(item.calculatedValue?.median || 0)}
+                  {format(effectiveValueSGD(item))}
                 </div>
                 <div className="text-[10px] text-zinc-500">
                   Grade: {item.mediaGrade} / {item.sleeveGrade}

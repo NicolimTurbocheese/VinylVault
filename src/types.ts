@@ -204,6 +204,11 @@ export interface MarketObservation {
   // Converted to SGD (the app's native unit) at capture time, so it lines up with
   // calculatedValue without needing the original rate later.
   lowestPriceSGD: number;
+  // Discogs' suggested price for THIS record's actual media grade, in SGD. Far better than
+  // lowestPriceSGD as a valuation, since the latter is just the cheapest listing at any
+  // condition. Absent when the token isn't seller-authorized or Discogs has no suggestion
+  // for that grade.
+  gradedValueSGD?: number;
   // What Discogs actually reported, kept for traceability.
   rawPrice: number;
   rawCurrency: string;

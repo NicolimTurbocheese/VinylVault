@@ -105,13 +105,44 @@ export const marketStats = onRequest(
       const stats: any = await statsRes.json();
       const lowest = stats?.lowest_price;
 
+      // 3. Condition-matched price suggestion. `lowest_price` above is simply the cheapest
+      // active listing regardless of condition, so a battered G copy sets it — using that
+      // as the value of an NM pressing would undervalue it badly. This endpoint returns a
+      // suggested price per Discogs condition grade, which can be matched to the grade the
+      // record actually carries. It needs a seller-authorized token, so it is treated as a
+      // bonus: if it 401s or is missing, the lowest-listing figure still comes back.
+      let suggestions: Record<string, number> | null = null;
+      let suggestionCurrency: string | null = null;
+      try {
+        const sugRes = await fetch(
+          `https://api.discogs.com/marketplace/price_suggestions/${encodeURIComponent(releaseId)}`,
+          { headers }
+        );
+        if (sugRes.ok) {
+          const sugJson: any = await sugRes.json();
+          const collected: Record<string, number> = {};
+          for (const [condition, payload] of Object.entries<any>(sugJson || {})) {
+            if (payload && typeof payload.value === "number") {
+              collected[condition] = payload.value;
+              if (!suggestionCurrency && payload.currency) suggestionCurrency = payload.currency;
+            }
+          }
+          if (Object.keys(collected).length > 0) suggestions = collected;
+        }
+      } catch (sugErr) {
+        console.warn("Discogs price suggestion fetch error:", sugErr);
+      }
+
       res.status(200).json({
-        available: lowest != null,
+        available: lowest != null || suggestions !== null,
         releaseId,
         lowestPrice: lowest?.value ?? null,
         currency: lowest?.currency ?? currency,
         numForSale: stats?.num_for_sale ?? 0,
         blockedFromSale: !!stats?.blocked_from_sale,
+        // Keyed by Discogs condition label, e.g. "Near Mint (NM or M-)".
+        suggestions,
+        suggestionCurrency,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to fetch marketplace stats." });

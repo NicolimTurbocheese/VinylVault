@@ -1,4 +1,5 @@
 import { ShelfItem } from "../types";
+import { effectiveValueSGD } from "./marketData";
 
 const SNAPSHOTS_STORAGE_KEY = "vinylvault_value_snapshots";
 
@@ -41,7 +42,7 @@ export function recordDailySnapshotIfNeeded(shelfItems: ShelfItem[]): ValueSnaps
   const totals = shelfItems.reduce(
     (acc, item) => {
       acc.totalLow += item.calculatedValue?.low || 0;
-      acc.totalMedian += item.calculatedValue?.median || 0;
+      acc.totalMedian += effectiveValueSGD(item);
       acc.totalHigh += item.calculatedValue?.high || 0;
       return acc;
     },
@@ -94,7 +95,7 @@ function valueAsOf(item: ShelfItem, day: string): number {
     .filter((h) => dayOf(h.date) > day)
     .sort((a, b) => dayOf(a.date).localeCompare(dayOf(b.date)));
   if (later.length > 0) return later[0].calculatedValue?.median || 0;
-  return item.calculatedValue?.median || 0;
+  return effectiveValueSGD(item);
 }
 
 const addDays = (day: string, n: number) => {
@@ -158,7 +159,7 @@ export function buildValueSeries(items: ShelfItem[], snapshots: ValueSnapshot[])
     const last = sortedSnaps[sortedSnaps.length - 1];
     points.push({
       date: today,
-      value: last ? last.totalMedian : items.reduce((s, i) => s + (i.calculatedValue?.median || 0), 0),
+      value: last ? last.totalMedian : items.reduce((s, i) => s + effectiveValueSGD(i), 0),
       measured: !!last && dayOf(last.date) === today,
     });
   }

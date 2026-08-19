@@ -44,3 +44,67 @@ export function estimateVsMarket(item: ShelfItem): { diff: number; pct: number }
   const diff = estimate - latest.lowestPriceSGD;
   return { diff, pct: (diff / latest.lowestPriceSGD) * 100 };
 }
+
+// Discogs labels conditions in full; the app stores Goldmine short codes.
+export const DISCOGS_CONDITION_BY_GRADE: Record<string, string> = {
+  M: "Mint (M)",
+  NM: "Near Mint (NM or M-)",
+  "VG+": "Very Good Plus (VG+)",
+  VG: "Very Good (VG)",
+  G: "Good (G)",
+  F_P: "Fair (F)",
+};
+
+// Picks the suggestion matching the record's own media grade. Falls back down the grade
+// ladder rather than up, so a missing suggestion never inflates a record's value.
+const GRADE_LADDER = ["M", "NM", "VG+", "VG", "G", "F_P"];
+
+export function suggestionForGrade(
+  suggestions: Record<string, number> | null | undefined,
+  mediaGrade: string | undefined
+): number | null {
+  if (!suggestions) return null;
+  const startIdx = Math.max(0, GRADE_LADDER.indexOf(mediaGrade || "VG+"));
+  for (let i = startIdx; i < GRADE_LADDER.length; i++) {
+    const label = DISCOGS_CONDITION_BY_GRADE[GRADE_LADDER[i]];
+    const val = label ? suggestions[label] : undefined;
+    if (typeof val === "number" && val > 0) return val;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Which number counts as "the value of this record"
+// ---------------------------------------------------------------------------
+const VALUATION_SOURCE_KEY = "vinylvault_valuation_source";
+export type ValuationSource = "market" | "estimate";
+
+export function getValuationSource(): ValuationSource {
+  return localStorage.getItem(VALUATION_SOURCE_KEY) === "estimate" ? "estimate" : "market";
+}
+
+export function setValuationSource(src: ValuationSource) {
+  localStorage.setItem(VALUATION_SOURCE_KEY, src);
+}
+
+// The value to actually report for a record. On "market", a real observed price wins over
+// the app's own estimate — condition-matched where Discogs offered one, otherwise the
+// cheapest current listing. Records never successfully polled fall back to the estimate, so
+// a partially-polled collection still totals correctly instead of dropping to zero.
+export function effectiveValueSGD(item: ShelfItem, source: ValuationSource = getValuationSource()): number {
+  const estimate = item.calculatedValue?.median || 0;
+  if (source === "estimate") return estimate;
+  const latest = latestObservation(item);
+  if (!latest) return estimate;
+  if (typeof latest.gradedValueSGD === "number" && latest.gradedValueSGD > 0) return latest.gradedValueSGD;
+  if (latest.lowestPriceSGD > 0) return latest.lowestPriceSGD;
+  return estimate;
+}
+
+// True when the reported value came from real market data rather than the app's estimate.
+export function isMarketValued(item: ShelfItem, source: ValuationSource = getValuationSource()): boolean {
+  if (source === "estimate") return false;
+  const latest = latestObservation(item);
+  if (!latest) return false;
+  return (latest.gradedValueSGD || 0) > 0 || latest.lowestPriceSGD > 0;
+}

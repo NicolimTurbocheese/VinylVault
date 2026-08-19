@@ -39,7 +39,7 @@ import { cleanFormatSpec } from "../utils/format";
 import { normalizeDiscogsGenre, DISCOGS_MACRO_GENRES } from "../utils/genre";
 import { apiUrl } from "../utils/apiBase";
 import { findDuplicateGroups, DuplicateGroup } from "../utils/duplicateCheck";
-import { withMarketObservation, toSGD } from "../utils/marketData";
+import { withMarketObservation, toSGD, suggestionForGrade, effectiveValueSGD } from "../utils/marketData";
 import { RecordCoverImage } from "./RecordCoverImage";
 import { CoverflowCarousel } from "./CoverflowCarousel";
 import { ViewDetailsModal } from "./ViewDetailsModal";
@@ -315,12 +315,21 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             unauthorized = true;
             break;
           }
-          if (data.available && typeof data.lowestPrice === "number") {
+          if (data.available && (typeof data.lowestPrice === "number" || data.suggestions)) {
+            // Prefer the suggestion for this record's own grade; the lowest listing is
+            // just the cheapest copy at any condition and undervalues a clean pressing.
+            const graded = suggestionForGrade(data.suggestions, item.mediaGrade);
+            const gradedSGD =
+              graded != null
+                ? Math.round(toSGD(graded, data.suggestionCurrency || data.currency) * 100) / 100
+                : undefined;
+
             const updated = withMarketObservation(
               { ...item, discogsReleaseId: data.releaseId || item.discogsReleaseId },
               {
                 date: today,
                 lowestPriceSGD: Math.round(toSGD(data.lowestPrice, data.currency) * 100) / 100,
+                gradedValueSGD: gradedSGD,
                 rawPrice: data.lowestPrice,
                 rawCurrency: data.currency,
                 numForSale: data.numForSale || 0,
@@ -458,10 +467,9 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
 
   // Summary Metrics
   const totalAlbums = shelfItems.length;
-  const totalValueMedian = shelfItems.reduce(
-    (acc, item) => acc + (item.calculatedValue?.median || 0),
-    0
-  );
+  // Uses the effective value per record — a real observed market price where one has been
+  // recorded, otherwise the app's own estimate. See effectiveValueSGD.
+  const totalValueMedian = shelfItems.reduce((acc, item) => acc + effectiveValueSGD(item), 0);
   const totalValueLow = shelfItems.reduce(
     (acc, item) => acc + (item.calculatedValue?.low || 0),
     0
@@ -599,7 +607,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                   {mostValuable.albumTitle}
                 </div>
                 <div className="text-xs font-sans text-[#A94A42] font-bold mt-0.5">
-                  {format(mostValuable.calculatedValue.median)} ({mostValuable.mediaGrade} / {mostValuable.sleeveGrade})
+                  {format(effectiveValueSGD(mostValuable))} ({mostValuable.mediaGrade} / {mostValuable.sleeveGrade})
                 </div>
               </div>
             ) : (
@@ -1274,7 +1282,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                   <div className="text-right ml-auto">
                     <span className="text-[9px] text-[#6B655B] block uppercase tracking-wider font-bold">Est. Value</span>
                     <span className="text-base font-serif font-bold text-[#A94A42]">
-                      {format(item.calculatedValue?.median || 0)}
+                      {format(effectiveValueSGD(item))}
                     </span>
                   </div>
                 </div>
