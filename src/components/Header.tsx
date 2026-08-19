@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, Disc3, Cloud, CloudOff, Palette } from "lucide-react";
+import { Search, Cloud, CloudOff, Palette } from "lucide-react";
 import { NAV_TABS, AppTab } from "./navTabs";
 import { useIsScrollLocked } from "../hooks/useIsScrollLocked";
 import { useCurrency } from "../context/CurrencyContext";
@@ -41,16 +41,19 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => setActiveTab("scan")}
             className="flex items-center gap-1.5 sm:gap-3 cursor-pointer group shrink-0"
           >
-            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full border border-[#A94A42]/50 flex items-center justify-center bg-[#A94A42]/10 text-[#A94A42] shrink-0">
-              <Disc3 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin-slow text-[#A94A42]" />
-            </div>
+            {/* The app mark, same artwork as the installed home-screen icon. */}
+            <img
+              src={`${import.meta.env.BASE_URL}logo.svg`}
+              alt=""
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg shrink-0"
+            />
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-base sm:text-3xl font-serif font-bold tracking-tight text-[#2B2B2B]">
+                <span className="text-base sm:text-2xl xl:text-3xl font-serif font-bold tracking-tight text-[#2B2B2B] whitespace-nowrap">
                   VinylVault
                 </span>
               </div>
-              <p className="hidden sm:block text-[11px] font-sans tracking-tight text-[#6B655B]">
+              <p className="hidden xl:block text-[11px] font-sans tracking-tight text-[#6B655B]">
                 Vinyl Valuation & Archival System
               </p>
             </div>
@@ -60,7 +63,7 @@ export const Header: React.FC<HeaderProps> = ({
               the page wider than the viewport (verified: tablet width at 768px was exactly
               where full labels used to switch on and no longer fit); full labels return once
               there's room. */}
-          <nav className="flex items-center gap-0.5 sm:gap-2 lg:gap-5 text-xs sm:text-sm font-medium font-sans">
+          <nav className="flex items-center gap-0.5 sm:gap-1.5 xl:gap-2 text-xs sm:text-sm font-medium font-sans">
             {/* Primary tabs live in the bottom bar on phones (see MobileTabBar) — five of
                 them plus the utility controls could not fit one header row on a 360px
                 screen and forced the whole page to scroll sideways. */}
@@ -77,7 +80,7 @@ export const Header: React.FC<HeaderProps> = ({
                 }`}
               >
                 <Icon className="w-3.5 h-3.5 shrink-0" />
-                <span className="hidden lg:inline">{label}</span>
+                <span className="hidden xl:inline whitespace-nowrap">{label}</span>
                 {key === "shelf" && shelfCount > 0 && (
                   <span
                     className={`px-1.5 py-0.2 text-[9px] font-bold rounded-sm ${
@@ -102,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               {isSyncing ? <Cloud className="w-3.5 h-3.5 shrink-0" /> : <CloudOff className="w-3.5 h-3.5 shrink-0" />}
-              <span className="hidden lg:inline">{isSyncing ? "SYNCED" : "SYNC"}</span>
+              <span className="hidden xl:inline whitespace-nowrap">{isSyncing ? "SYNCED" : "SYNC"}</span>
             </button>
 
             <button
@@ -129,7 +132,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onOpenCommandPalette}
               title="Quick search & navigate"
-              className="hidden lg:flex items-center gap-1.5 py-1.5 px-2.5 rounded-md border border-[#D8D0C0] text-[#6B655B] hover:text-[#2B2B2B] hover:border-[#A94A42]/40 bg-[#EFEAE0]/60 transition-all"
+              className="hidden xl:flex items-center gap-1.5 py-1.5 px-2.5 rounded-md border border-[#D8D0C0] text-[#6B655B] hover:text-[#2B2B2B] hover:border-[#A94A42]/40 bg-[#EFEAE0]/60 transition-all"
             >
               <Search className="w-3 h-3" />
               <kbd className="text-[10px] font-mono font-bold">⌘K</kbd>

@@ -331,7 +331,16 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
                 <Tooltip
                   contentStyle={{ backgroundColor: "#0C0C0C", borderColor: "#D4AF37", borderRadius: "4px", color: "#fff", fontFamily: "JetBrains Mono" }}
                 />
-                <Legend wrapperStyle={{ fontSize: "11px", color: "#a1a1aa", fontFamily: "JetBrains Mono" }} />
+                {/* Recharts colours each legend label to match its slice, so the pale
+                    yellow slice rendered its label at ~1.6 contrast on the themed light
+                    card — effectively invisible. Force labels to the theme's text colour
+                    instead; the colour swatch beside each one still identifies the slice. */}
+                <Legend
+                  wrapperStyle={{ fontSize: "11px", fontFamily: "JetBrains Mono" }}
+                  formatter={(value) => (
+                    <span style={{ color: "var(--vv-text)" }}>{value}</span>
+                  )}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>

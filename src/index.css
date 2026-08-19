@@ -78,9 +78,13 @@
     --vv-text: #ECFDF5;
     --vv-text-muted: #94A3B8;
     --vv-text-faint: #64748B;
-    --vv-accent: #10B981;
-    --vv-accent-hover: #0D9668;
-    --vv-accent-rgb: 16, 185, 129;
+    /* Darkened from #10B981: theme rules put white text on accent surfaces (badges,
+       active toggles), and the brighter mint gave that only a 2.54 contrast ratio,
+       under the 4.5 WCAG AA minimum. #047857 keeps the neon-green character while
+       clearing AA against white. */
+    --vv-accent: #047857;
+    --vv-accent-hover: #065F46;
+    --vv-accent-rgb: 4, 120, 87;
     --vv-secondary: #22D3EE;
     --vv-secondary-rgb: 34, 211, 238;
     --vv-secondary-text: #A5F3FC;

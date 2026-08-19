@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="VinylVault">
+  <!-- VinylVault mark: a record whose centre label is a vault keyhole.
+       Built on a filled tile so it reads correctly as a home-screen icon, where
+       transparent areas would otherwise be filled with black by the OS. -->
+  <rect width="512" height="512" rx="112" fill="#F5F2EB"/>
+
+  <!-- the disc -->
+  <circle cx="256" cy="256" r="176" fill="#2B2B2B"/>
+
+  <!-- grooves -->
+  <g fill="none" stroke="#F5F2EB" stroke-opacity="0.14" stroke-width="5">
+    <circle cx="256" cy="256" r="156"/>
+    <circle cx="256" cy="256" r="138"/>
+    <circle cx="256" cy="256" r="120"/>
+    <circle cx="256" cy="256" r="102"/>
+  </g>
+
+  <!-- sheen, so the disc doesn't read as a flat dot at small sizes -->
+  <path d="M256 80a176 176 0 0 1 124 300L256 256Z" fill="#FFFFFF" fill-opacity="0.05"/>
+
+  <!-- centre label -->
+  <circle cx="256" cy="256" r="84" fill="#A94A42"/>
+  <circle cx="256" cy="256" r="84" fill="none" stroke="#2B2B2B" stroke-opacity="0.25" stroke-width="3"/>
+
+  <!-- keyhole: the "vault" half of the idea, and doubles as the spindle hole -->
+  <circle cx="256" cy="234" r="30" fill="#F5F2EB"/>
+  <path d="M238 252h36l14 54h-64z" fill="#F5F2EB"/>
+</svg>
