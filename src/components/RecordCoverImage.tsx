@@ -303,7 +303,7 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
               setIsScanModalOpen(true);
             }}
             disabled={isLoading}
-            className="p-1.5 rounded-full shadow-md transition-all cursor-pointer flex items-center justify-center bg-black/75 hover:bg-[#2D4A3E] text-white opacity-80 group-hover/cover:opacity-100 hover:scale-110"
+            className="p-1.5 min-w-8 min-h-8 rounded-full shadow-md transition-all cursor-pointer flex items-center justify-center bg-black/75 hover:bg-[#2D4A3E] text-white opacity-80 group-hover/cover:opacity-100 hover:scale-110"
             title="Scan a photo of your own copy instead"
           >
             <Camera className="w-3 h-3" />
@@ -312,7 +312,7 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
             type="button"
             onClick={handleFetchAlternativeImage}
             disabled={isLoading}
-            className={`p-1.5 rounded-full shadow-md transition-all cursor-pointer flex items-center justify-center ${
+            className={`p-1.5 min-w-8 min-h-8 rounded-full shadow-md transition-all cursor-pointer flex items-center justify-center ${
               hasError
                 ? "bg-[#A94A42] text-white hover:bg-[#8E3E37] ring-2 ring-white scale-100 opacity-100"
                 : "bg-black/75 hover:bg-[#A94A42] text-white opacity-80 group-hover/cover:opacity-100 hover:scale-110"

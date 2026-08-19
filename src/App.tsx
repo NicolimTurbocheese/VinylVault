@@ -11,6 +11,7 @@ import { ToastStack, ToastMessage } from "./components/ToastStack";
 import { CommandPalette } from "./components/CommandPalette";
 import { Confetti } from "./components/Confetti";
 import { WantlistTab } from "./components/WantlistTab";
+import { MobileTabBar } from "./components/MobileTabBar";
 import { RecordScanResult, ShelfItem, VinylBox, WantlistItem, UNCATEGORISED_BOX_ID } from "./types";
 import { calculateAdjustedValuation } from "./utils/valuation";
 import { cleanFormatSpec } from "./utils/format";
@@ -130,9 +131,17 @@ export default function App() {
   };
 
   const loadShelf = () => {
-    // Gather all local storage records from every legacy storage key and merge/dedupe them
+    // Gather all local storage records from every legacy storage key and merge/dedupe them.
+    //
+    // Order matters: legacy keys are read FIRST and the canonical key LAST, because the
+    // merge below lets later entries win. Saves only ever write to the canonical key, so
+    // if a legacy key were read last its stale copy would clobber freshly edited fields
+    // (renaming a record, then reloading, silently reverted the name — a real data-loss
+    // bug). Legacy keys are cleared once merged, so they can't resurrect old data later.
     const localItems: ShelfItem[] = [];
-    const keysToCheck = ["vinylvault_shelf", "vinyl_vault_shelf_v1", "vinyl_shelf"];
+    const CANONICAL_KEY = "vinylvault_shelf";
+    const LEGACY_KEYS = ["vinyl_vault_shelf_v1", "vinyl_shelf"];
+    const keysToCheck = [...LEGACY_KEYS, CANONICAL_KEY];
     for (const key of keysToCheck) {
       const raw = localStorage.getItem(key);
       if (raw) {
@@ -178,7 +187,14 @@ export default function App() {
     }
 
     setShelfItems(mergedList);
-    localStorage.setItem("vinylvault_shelf", JSON.stringify(mergedList));
+    localStorage.setItem(CANONICAL_KEY, JSON.stringify(mergedList));
+
+    // Everything from the legacy keys is now merged into the canonical key and written
+    // back above, so drop them. Leaving them in place is what allowed stale copies to
+    // keep overriding edited records on every subsequent load.
+    for (const key of LEGACY_KEYS) {
+      if (localStorage.getItem(key) !== null) localStorage.removeItem(key);
+    }
   };
 
   const saveShelfToLocal = (items: ShelfItem[]) => {
@@ -658,7 +674,11 @@ export default function App() {
       </main>
 
       {/* Footer / Bottom Bar */}
-      <footer className="border-t border-[#E2DCD0] bg-[#FAF8F3]/90 py-6 text-center text-xs text-[#6B655B] relative z-10">
+      {/* pb clears the fixed MobileTabBar (plus the device safe-area) on phones only */}
+      <footer
+        className="border-t border-[#E2DCD0] bg-[#FAF8F3]/90 py-6 pb-[calc(1.5rem+64px)] md:pb-6 text-center text-xs text-[#6B655B] relative z-10"
+        style={{ ["--tabbar-safe" as any]: "env(safe-area-inset-bottom, 0px)" }}
+      >
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="flex items-center gap-1.5">
             <span className="font-serif font-bold text-[#A94A42]">VinylVault</span>
@@ -668,6 +688,8 @@ export default function App() {
           </p>
         </div>
       </footer>
+
+      <MobileTabBar activeTab={activeTab} setActiveTab={setActiveTab} shelfCount={shelfItems.length} />
 
       {/* Add / Edit Shelf Modal */}
       <AddToShelfModal

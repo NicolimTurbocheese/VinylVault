@@ -1,12 +1,13 @@
 import React from "react";
-import { Search, Library, BarChart3, Disc3, Cloud, CloudOff, Package, Palette, Heart } from "lucide-react";
+import { Search, Disc3, Cloud, CloudOff, Palette } from "lucide-react";
+import { NAV_TABS, AppTab } from "./navTabs";
 import { useIsScrollLocked } from "../hooks/useIsScrollLocked";
 import { useCurrency } from "../context/CurrencyContext";
 import { SUPPORTED_CURRENCIES } from "../utils/currency";
 
 interface HeaderProps {
-  activeTab: "scan" | "shelf" | "insights" | "organise" | "wantlist";
-  setActiveTab: (tab: "scan" | "shelf" | "insights" | "organise" | "wantlist") => void;
+  activeTab: AppTab;
+  setActiveTab: (tab: AppTab) => void;
   shelfCount: number;
   isSyncing: boolean;
   onOpenSync: () => void;
@@ -60,86 +61,41 @@ export const Header: React.FC<HeaderProps> = ({
               where full labels used to switch on and no longer fit); full labels return once
               there's room. */}
           <nav className="flex items-center gap-0.5 sm:gap-2 lg:gap-5 text-xs sm:text-sm font-medium font-sans">
-            <button
-              onClick={() => setActiveTab("scan")}
-              title="Scan / Search"
-              className={`flex items-center gap-1.5 py-1.5 px-1.5 lg:px-2.5 uppercase tracking-wider transition-all rounded-md ${
-                activeTab === "scan"
-                  ? "text-[#A94A42] bg-[#A94A42]/10 border border-[#A94A42]/30 font-bold"
-                  : "text-[#6B655B] border border-transparent hover:text-[#2B2B2B] hover:bg-[#E2DCD0]/30"
-              }`}
-            >
-              <Search className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden lg:inline">SCAN / SEARCH</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("shelf")}
-              title="My Shelf"
-              className={`flex items-center gap-1.5 py-1.5 px-1.5 lg:px-2.5 uppercase tracking-wider transition-all rounded-md relative ${
-                activeTab === "shelf"
-                  ? "text-[#A94A42] bg-[#A94A42]/10 border border-[#A94A42]/30 font-bold"
-                  : "text-[#6B655B] border border-transparent hover:text-[#2B2B2B] hover:bg-[#E2DCD0]/30"
-              }`}
-            >
-              <Library className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden lg:inline">MY SHELF</span>
-              {shelfCount > 0 && (
-                <span
-                  className={`px-1.5 py-0.2 text-[9px] font-bold rounded-sm ${
-                    activeTab === "shelf"
-                      ? "bg-[#A94A42] text-white"
-                      : "bg-[#8FA89B]/20 text-[#2D4A3E] border border-[#8FA89B]/50"
-                  }`}
-                >
-                  {shelfCount}
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab("insights")}
-              title="Insights"
-              className={`flex items-center gap-1.5 py-1.5 px-1.5 lg:px-2.5 uppercase tracking-wider transition-all rounded-md ${
-                activeTab === "insights"
-                  ? "text-[#A94A42] bg-[#A94A42]/10 border border-[#A94A42]/30 font-bold"
-                  : "text-[#6B655B] border border-transparent hover:text-[#2B2B2B] hover:bg-[#E2DCD0]/30"
-              }`}
-            >
-              <BarChart3 className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden lg:inline">INSIGHTS</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("organise")}
-              title="Organise"
-              className={`flex items-center gap-1.5 py-1.5 px-1.5 lg:px-2.5 uppercase tracking-wider transition-all rounded-md ${
-                activeTab === "organise"
-                  ? "text-[#A94A42] bg-[#A94A42]/10 border border-[#A94A42]/30 font-bold"
-                  : "text-[#6B655B] border border-transparent hover:text-[#2B2B2B] hover:bg-[#E2DCD0]/30"
-              }`}
-            >
-              <Package className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden lg:inline">ORGANISE</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("wantlist")}
-              title="Wantlist"
-              className={`flex items-center gap-1.5 py-1.5 px-1.5 lg:px-2.5 uppercase tracking-wider transition-all rounded-md ${
-                activeTab === "wantlist"
-                  ? "text-[#A94A42] bg-[#A94A42]/10 border border-[#A94A42]/30 font-bold"
-                  : "text-[#6B655B] border border-transparent hover:text-[#2B2B2B] hover:bg-[#E2DCD0]/30"
-              }`}
-            >
-              <Heart className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden lg:inline">WANTLIST</span>
-            </button>
+            {/* Primary tabs live in the bottom bar on phones (see MobileTabBar) — five of
+                them plus the utility controls could not fit one header row on a 360px
+                screen and forced the whole page to scroll sideways. */}
+            {NAV_TABS.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                title={label}
+                aria-current={activeTab === key ? "page" : undefined}
+                className={`hidden md:flex items-center justify-center gap-1.5 min-h-10 lg:min-h-0 py-1.5 px-2.5 lg:px-2.5 uppercase tracking-wider transition-all rounded-md relative ${
+                  activeTab === key
+                    ? "text-[#A94A42] bg-[#A94A42]/10 border border-[#A94A42]/30 font-bold"
+                    : "text-[#6B655B] border border-transparent hover:text-[#2B2B2B] hover:bg-[#E2DCD0]/30"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden lg:inline">{label}</span>
+                {key === "shelf" && shelfCount > 0 && (
+                  <span
+                    className={`px-1.5 py-0.2 text-[9px] font-bold rounded-sm ${
+                      activeTab === "shelf"
+                        ? "bg-[#A94A42] text-white"
+                        : "bg-[#8FA89B]/20 text-[#2D4A3E] border border-[#8FA89B]/50"
+                    }`}
+                  >
+                    {shelfCount}
+                  </span>
+                )}
+              </button>
+            ))}
 
             <button
               onClick={onOpenSync}
               title={isSyncing ? "Cross-device sync is on" : "Set up cross-device sync"}
-              className={`flex items-center gap-1.5 py-1.5 px-1.5 lg:px-2.5 uppercase tracking-wider transition-all rounded-md border ${
+              className={`flex items-center justify-center gap-1.5 min-w-11 min-h-11 md:min-w-10 md:min-h-10 py-1.5 px-2 lg:px-2.5 uppercase tracking-wider transition-all rounded-md border ${
                 isSyncing
                   ? "text-[#2D4A3E] bg-[#8FA89B]/20 border-[#8FA89B]/50"
                   : "text-[#6B655B] border-transparent hover:text-[#2B2B2B] hover:bg-[#E2DCD0]/30"
@@ -152,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onOpenTheme}
               title="Change visual theme"
-              className="p-1.5 sm:p-2 rounded-md text-[#6B655B] border border-transparent hover:text-[#A94A42] hover:bg-[#E2DCD0]/30 transition-all"
+              className="flex items-center justify-center min-w-11 min-h-11 md:min-w-10 md:min-h-10 p-1.5 sm:p-2 rounded-md text-[#6B655B] border border-transparent hover:text-[#A94A42] hover:bg-[#E2DCD0]/30 transition-all"
             >
               <Palette className="w-3.5 h-3.5" />
             </button>
@@ -161,7 +117,7 @@ export const Header: React.FC<HeaderProps> = ({
               value={currency}
               onChange={(e) => setCurrency(e.target.value as typeof currency)}
               title="Display currency (values are stored in SGD; this only converts what's shown, at a fixed approximate rate)"
-              className="p-1.5 sm:px-2 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-sans font-bold text-[#6B655B] border border-transparent hover:text-[#A94A42] hover:bg-[#E2DCD0]/30 bg-transparent transition-all cursor-pointer focus:outline-none"
+              className="min-h-11 md:min-h-10 p-1.5 sm:px-2 sm:py-1.5 rounded-md text-[11px] sm:text-xs font-sans font-bold text-[#6B655B] border border-transparent hover:text-[#A94A42] hover:bg-[#E2DCD0]/30 bg-transparent transition-all cursor-pointer focus:outline-none"
             >
               {SUPPORTED_CURRENCIES.map((c) => (
                 <option key={c} value={c}>

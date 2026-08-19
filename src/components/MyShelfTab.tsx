@@ -600,7 +600,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
           {/* Genre + Style Multi-Select Filter Toggle */}
           <button
             onClick={() => setIsFilterPanelOpen((prev) => !prev)}
-            className={`flex items-center gap-1.5 text-xs font-sans px-2.5 py-1.5 rounded-md border transition w-full sm:w-auto justify-center ${
+            className={`flex items-center gap-1.5 text-xs font-sans px-2.5 py-1.5 min-h-11 lg:min-h-0 rounded-md border transition w-full sm:w-auto justify-center ${
               selectedGenres.length > 0 || selectedStyles.length > 0
                 ? "text-[#A94A42] bg-[#A94A42]/10 border-[#A94A42]/30 font-bold"
                 : "text-[#6B655B] bg-[#EFEAE0] border-[#D8D0C0] hover:bg-[#E2DCD0]/40"
@@ -615,7 +615,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
           {needsReviewCount > 0 && (
             <button
               onClick={() => setNeedsReviewOnly((prev) => !prev)}
-              className={`flex items-center gap-1.5 text-xs font-sans px-2.5 py-1.5 rounded-md border transition w-full sm:w-auto justify-center ${
+              className={`flex items-center gap-1.5 text-xs font-sans px-2.5 py-1.5 min-h-11 lg:min-h-0 rounded-md border transition w-full sm:w-auto justify-center ${
                 needsReviewOnly
                   ? "text-amber-700 bg-amber-100 border-amber-400 font-bold"
                   : "text-amber-700 bg-amber-50 border-amber-300 hover:bg-amber-100"
@@ -636,7 +636,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             <button
               onClick={() => setViewMode("grid")}
               title="Grid view"
-              className={`px-2.5 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition ${
+              className={`px-3 py-1.5 min-h-11 lg:min-h-0 lg:px-2.5 flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition ${
                 viewMode === "grid" ? "bg-[#A94A42] text-white" : "bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40"
               }`}
             >
@@ -646,7 +646,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             <button
               onClick={() => setViewMode("coverflow")}
               title="Coverflow view"
-              className={`px-2.5 py-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition ${
+              className={`px-3 py-1.5 min-h-11 lg:min-h-0 lg:px-2.5 flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition ${
                 viewMode === "coverflow" ? "bg-[#A94A42] text-white" : "bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40"
               }`}
             >
@@ -659,7 +659,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             <button
               onClick={() => setCardDensity((prev) => (prev === "detailed" ? "compact" : "detailed"))}
               title={cardDensity === "detailed" ? "Switch to compact view" : "Switch to detailed view"}
-              className="px-2.5 py-1.5 rounded-md border border-[#D8D0C0] bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
+              className="px-3 py-1.5 min-h-11 lg:min-h-0 lg:px-2.5 rounded-md border border-[#D8D0C0] bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40 flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
             >
               {cardDensity === "detailed" ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
               <span>{cardDensity === "detailed" ? "Detailed" : "Compact"}</span>
@@ -673,7 +673,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                 pickRandom("");
               }}
               title="Pick a random record to play tonight"
-              className="px-2.5 py-1.5 rounded-md border border-[#D8D0C0] bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
+              className="px-3 py-1.5 min-h-11 lg:min-h-0 lg:px-2.5 rounded-md border border-[#D8D0C0] bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40 flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
             >
               <Shuffle className="w-3.5 h-3.5" />
               <span>Random</span>
@@ -684,7 +684,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             <button
               onClick={() => (isSelectMode ? exitSelectMode() : setIsSelectMode(true))}
               title="Select multiple records to batch-edit"
-              className={`px-2.5 py-1.5 rounded-md border flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer ${
+              className={`px-3 py-1.5 min-h-11 lg:min-h-0 lg:px-2.5 rounded-md border flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer ${
                 isSelectMode
                   ? "bg-[#A94A42] text-white border-[#A94A42]"
                   : "border-[#D8D0C0] bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40"
@@ -701,7 +701,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#A94A42] transition font-sans"
+              className="bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] rounded-md px-2.5 py-1.5 min-h-11 lg:min-h-0 text-xs focus:outline-none focus:border-[#A94A42] transition font-sans"
             >
               <option value="value-desc">Value (High to Low)</option>
               <option value="value-asc">Value (Low to High)</option>
@@ -729,7 +729,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             />
             <button
               onClick={() => setIsMoreMenuOpen((prev) => !prev)}
-              className="px-3 py-1.5 rounded-md bg-[#EFEAE0] text-[#2B2B2B] border border-[#D8D0C0] hover:bg-[#FAF8F3] text-xs font-sans font-bold uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer"
+              className="px-3 py-1.5 min-h-11 lg:min-h-0 rounded-md bg-[#EFEAE0] text-[#2B2B2B] border border-[#D8D0C0] hover:bg-[#FAF8F3] text-xs font-sans font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition cursor-pointer"
               title="More actions"
             >
               <MoreVertical className="w-3.5 h-3.5 text-[#6B655B]" />
@@ -743,7 +743,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                     setIsMoreMenuOpen(false);
                     importFileInputRef.current?.click();
                   }}
-                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left"
+                  className="w-full px-3.5 py-2.5 lg:py-2 min-h-11 lg:min-h-0 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left"
                 >
                   <Upload className="w-3.5 h-3.5 text-[#6B655B]" />
                   <span>Import from JSON</span>
@@ -755,7 +755,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                     importPatchFileInputRef.current?.click();
                   }}
                   title="Updates existing records only (matched by title+artist) — never adds new records"
-                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left"
+                  className="w-full px-3.5 py-2.5 lg:py-2 min-h-11 lg:min-h-0 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left"
                 >
                   <Upload className="w-3.5 h-3.5 text-[#6B655B]" />
                   <span>Update Existing Records (Patch)</span>
@@ -767,7 +767,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                     exportToCSV(shelfItems);
                   }}
                   disabled={shelfItems.length === 0}
-                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full px-3.5 py-2.5 lg:py-2 min-h-11 lg:min-h-0 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5 text-[#6B655B]" />
                   <span>Export to CSV</span>
@@ -779,7 +779,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                     exportToJSON(shelfItems);
                   }}
                   disabled={shelfItems.length === 0}
-                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full px-3.5 py-2.5 lg:py-2 min-h-11 lg:min-h-0 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <FileJson className="w-3.5 h-3.5 text-[#6B655B]" />
                   <span>Export to JSON</span>
@@ -791,7 +791,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                     exportValuationReportPdf(shelfItems);
                   }}
                   disabled={shelfItems.length === 0}
-                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full px-3.5 py-2.5 lg:py-2 min-h-11 lg:min-h-0 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <FileText className="w-3.5 h-3.5 text-[#6B655B]" />
                   <span>Valuation Report (PDF)</span>
@@ -805,7 +805,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                     handleBulkFetchCovers();
                   }}
                   disabled={missingCoverItems.length === 0 || !!coverFetchProgress}
-                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full px-3.5 py-2.5 lg:py-2 min-h-11 lg:min-h-0 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 text-[#6B655B] ${coverFetchProgress ? "animate-spin" : ""}`} />
                   <span>
@@ -823,7 +823,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                     handleBulkFetchTracklists();
                   }}
                   disabled={missingTracklistItems.length === 0 || !!tracklistFetchProgress}
-                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full px-3.5 py-2.5 lg:py-2 min-h-11 lg:min-h-0 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <ListMusic className={`w-3.5 h-3.5 text-[#6B655B] ${tracklistFetchProgress ? "animate-pulse" : ""}`} />
                   <span>
@@ -841,7 +841,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                     setIsRecalcConfirmOpen(true);
                   }}
                   disabled={shelfItems.length === 0 || !!recalcProgress}
-                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full px-3.5 py-2.5 lg:py-2 min-h-11 lg:min-h-0 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <DollarSign className={`w-3.5 h-3.5 text-[#6B655B] ${recalcProgress ? "animate-pulse" : ""}`} />
                   <span>
@@ -857,7 +857,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                     setDuplicateGroups(findDuplicateGroups(shelfItems));
                   }}
                   disabled={shelfItems.length === 0}
-                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full px-3.5 py-2.5 lg:py-2 min-h-11 lg:min-h-0 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Layers className="w-3.5 h-3.5 text-[#6B655B]" />
                   <span>Check for Duplicates</span>
@@ -869,7 +869,7 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                     setIsAuditOpen(true);
                   }}
                   disabled={shelfItems.length === 0}
-                  className="w-full px-3.5 py-2 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full px-3.5 py-2.5 lg:py-2 min-h-11 lg:min-h-0 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <ClipboardCheck className="w-3.5 h-3.5 text-[#6B655B]" />
                   <span>Data Audit (What's Missing)</span>
@@ -1272,21 +1272,21 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setItemToView(item)}
-                    className="p-1.5 rounded text-[#6B655B] hover:text-[#A94A42] hover:bg-[#EFEAE0] transition cursor-pointer"
+                    className="p-1.5 min-w-11 min-h-11 lg:min-w-0 lg:min-h-0 flex items-center justify-center rounded text-[#6B655B] hover:text-[#A94A42] hover:bg-[#EFEAE0] transition cursor-pointer"
                     title="View Record Details"
                   >
                     <Eye className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => onEditItem(item)}
-                    className="p-1.5 rounded text-[#6B655B] hover:text-[#A94A42] hover:bg-[#EFEAE0] transition cursor-pointer"
+                    className="p-1.5 min-w-11 min-h-11 lg:min-w-0 lg:min-h-0 flex items-center justify-center rounded text-[#6B655B] hover:text-[#A94A42] hover:bg-[#EFEAE0] transition cursor-pointer"
                     title="Edit Record Details"
                   >
                     <Edit className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => setItemToDelete(item)}
-                    className="p-1.5 rounded text-[#6B655B] hover:text-[#A94A42] hover:bg-[#EFEAE0] transition cursor-pointer"
+                    className="p-1.5 min-w-11 min-h-11 lg:min-w-0 lg:min-h-0 flex items-center justify-center rounded text-[#6B655B] hover:text-[#A94A42] hover:bg-[#EFEAE0] transition cursor-pointer"
                     title="Remove from Shelf"
                   >
                     <Trash2 className="w-3.5 h-3.5" />

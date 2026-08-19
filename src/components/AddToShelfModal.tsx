@@ -59,6 +59,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
   const [boxId, setBoxId] = useState<string>(UNCATEGORISED_BOX_ID);
   const [matrixCode, setMatrixCode] = useState<string>("");
   const [albumTitle, setAlbumTitle] = useState<string>("");
+  const [catalogueNumber, setCatalogueNumber] = useState<string>("");
   const [artist, setArtist] = useState<string>("");
   const [purchaseDate, setPurchaseDate] = useState<string>(todayIso());
   const [subgenreLibrary, setSubgenreLibrary] = useState<string[]>(() => getStoredSubgenres());
@@ -102,6 +103,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
       setCustomValuationAdj("0");
       setMatrixCode(existingItem.matrixCode || "");
       setAlbumTitle(existingItem.albumTitle || "");
+      setCatalogueNumber(existingItem.catalogueNumber || "");
       setArtist(existingItem.artist || "");
       setPurchaseDate(existingItem.purchaseDate || (existingItem.addedAt ? existingItem.addedAt.slice(0, 10) : todayIso()));
       setProposedValuation(null);
@@ -153,6 +155,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
       setCustomValuationAdj((record as any).initialValuationAdj !== undefined ? String((record as any).initialValuationAdj) : "0");
       setMatrixCode(record.matrixCode || "");
       setAlbumTitle(record.albumTitle || "");
+      setCatalogueNumber(record.catalogueNumber || "");
       setArtist(record.artist || "");
       setPurchaseDate(todayIso());
       setProposedValuation(null);
@@ -233,7 +236,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
         body: JSON.stringify({
           albumTitle: activeRecord.albumTitle,
           artist: activeRecord.artist,
-          catalogueNumber: activeRecord.catalogueNumber,
+          catalogueNumber: catalogueNumber.trim() || activeRecord.catalogueNumber,
           country: activeRecord.country,
           label: activeRecord.label,
           genre,
@@ -280,6 +283,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
     const shelfPayload: ShelfItem = {
       ...activeRecord,
       albumTitle: albumTitle.trim() || activeRecord.albumTitle,
+      catalogueNumber: catalogueNumber.trim() || undefined,
       artist: artist.trim() || activeRecord.artist,
       coverArtUrl: coverArtUrl || activeRecord.coverArtUrl,
       genre,
@@ -341,7 +345,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
               src={coverArtUrl || activeRecord.coverArtUrl}
               artist={activeRecord.artist}
               albumTitle={activeRecord.albumTitle}
-              catalogueNumber={activeRecord.catalogueNumber}
+              catalogueNumber={catalogueNumber || activeRecord.catalogueNumber}
               matrixCode={matrixCode}
               onImageChange={(newUrl) => setCoverArtUrl(newUrl)}
               className="w-16 h-16 rounded border border-[#D8D0C0] shadow-xs flex-shrink-0"
@@ -365,9 +369,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
 
               {/* Cat#, Matrix, Barcode, Year, Publisher - All uniform plain text design */}
               <div className="flex items-center gap-x-2 gap-y-0.5 mt-1 text-[11px] font-sans text-[#6B655B] flex-wrap leading-relaxed">
-                {activeRecord.catalogueNumber && (
-                  <span>Cat#: {activeRecord.catalogueNumber}</span>
-                )}
+                {catalogueNumber && <span>Cat#: {catalogueNumber}</span>}
                 {activeRecord.matrixCode && (
                   <span>Matrix: {activeRecord.matrixCode}</span>
                 )}
@@ -637,8 +639,21 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
             </div>
           )}
 
-          {/* Matrix Code + Purchase Date */}
+          {/* Catalogue Number + Matrix Code + Purchase Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-[#A94A42]" />
+                Catalogue Number
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. CP-8430"
+                value={catalogueNumber}
+                onChange={(e) => setCatalogueNumber(e.target.value)}
+                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] placeholder-[#8C857B] rounded-md px-3 py-2 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
+              />
+            </div>
             <div>
               <label className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#A94A42] mb-1 flex items-center gap-1.5">
                 <Tag className="w-3.5 h-3.5 text-[#A94A42]" />

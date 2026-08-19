@@ -642,7 +642,7 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
                         key={`top-m-${g}`}
                         type="button"
                         onClick={() => handleMediaGradeChange(g)}
-                        className={`flex-1 py-1.5 rounded-md text-[11px] font-sans font-bold uppercase transition border cursor-pointer ${
+                        className={`flex-1 py-1.5 min-h-11 lg:min-h-0 flex items-center justify-center rounded-md text-[11px] font-sans font-bold uppercase transition border cursor-pointer ${
                           isSelected
                             ? "border-[#A94A42] text-[#A94A42] bg-[#A94A42]/10 shadow-xs"
                             : "border-[#D8D0C0] text-[#2B2B2B] bg-white hover:border-[#A94A42] shadow-xs"
@@ -668,7 +668,7 @@ export const ScanSearchTab: React.FC<ScanSearchTabProps> = ({
                         key={`top-s-${g}`}
                         type="button"
                         onClick={() => handleSleeveGradeChange(g)}
-                        className={`flex-1 py-1.5 rounded-md text-[11px] font-sans font-bold uppercase transition border cursor-pointer ${
+                        className={`flex-1 py-1.5 min-h-11 lg:min-h-0 flex items-center justify-center rounded-md text-[11px] font-sans font-bold uppercase transition border cursor-pointer ${
                           isSelected
                             ? "border-[#A94A42] text-[#A94A42] bg-[#A94A42]/10 shadow-xs"
                             : "border-[#D8D0C0] text-[#2B2B2B] bg-white hover:border-[#A94A42] shadow-xs"
