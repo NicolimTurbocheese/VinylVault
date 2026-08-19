@@ -76,7 +76,7 @@ export const DataAuditModal: React.FC<DataAuditModalProps> = ({
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setActiveRule(null)}
-              className={`px-2.5 py-1.5 rounded-md text-[11px] font-sans font-bold border transition cursor-pointer ${
+              className={`px-3 py-1.5 min-h-11 lg:min-h-0 lg:px-2.5 flex items-center rounded-md text-[11px] font-sans font-bold border transition cursor-pointer ${
                 activeRule === null
                   ? "bg-[#A94A42] text-white border-[#A94A42]"
                   : "bg-[#EFEAE0] text-[#2B2B2B] border-[#D8D0C0] hover:bg-white"
@@ -92,7 +92,7 @@ export const DataAuditModal: React.FC<DataAuditModalProps> = ({
                   key={rule.key}
                   onClick={() => setActiveRule(rule.key === activeRule ? null : rule.key)}
                   title={rule.why}
-                  className={`px-2.5 py-1.5 rounded-md text-[11px] font-sans font-bold border transition cursor-pointer ${
+                  className={`px-3 py-1.5 min-h-11 lg:min-h-0 lg:px-2.5 flex items-center rounded-md text-[11px] font-sans font-bold border transition cursor-pointer ${
                     activeRule === rule.key
                       ? "bg-[#A94A42] text-white border-[#A94A42]"
                       : "bg-[#EFEAE0] text-[#2B2B2B] border-[#D8D0C0] hover:bg-white"

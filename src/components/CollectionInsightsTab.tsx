@@ -29,7 +29,7 @@ import {
 } from "recharts";
 import { ShelfItem } from "../types";
 import { useCountUp } from "../hooks/useCountUp";
-import { getStoredSnapshots } from "../utils/valueSnapshots";
+import { getStoredSnapshots, buildValueSeries } from "../utils/valueSnapshots";
 import { useCurrency } from "../context/CurrencyContext";
 import { convertFromSGD, formatConvertedAmount } from "../utils/currency";
 
@@ -128,78 +128,45 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
 
   const COLORS = ["#D4AF37", "#FFBF00", "#997A15", "#B38F24", "#66520E", "#E5C158"];
 
-  // 5. Collection value over time. Real daily snapshots (recorded automatically once per
-  // day by App.tsx) are the preferred source — an actual measured history of the
-  // collection's total value, not a proxy, and the daily granularity is what makes a real
-  // stock-app-style timeframe toggle (1W/1M/3M/1Y/ALL) meaningful. Until at least two days
-  // of snapshots exist, fall back to a running total by acquisition date (purchaseDate, or
-  // addedAt if that's missing) so the chart isn't just empty for a brand-new collection —
-  // the timeframe toggle has no effect in that fallback mode, since acquisition order isn't
-  // a real timeline to window into.
+  // 5. Collection value over time — one continuous series running from the earliest thing
+  // on record right up to today, the way a stock chart shows history rather than only what
+  // has happened since you opened the app. The stretch predating daily snapshots is
+  // reconstructed from each record's acquisition date and its `history` log; measured
+  // snapshots take over from the first one onward. See buildValueSeries for exactly what
+  // the reconstructed portion can and cannot claim.
   const allSnapshots = getStoredSnapshots();
-  const usingRealSnapshots = allSnapshots.length > 1;
+  const fullSeries = buildValueSeries(shelfItems, allSnapshots);
+  const hasSeries = fullSeries.length > 1;
 
   const TIMEFRAME_DAYS: Record<typeof timeframe, number | null> = { "1W": 7, "1M": 30, "3M": 90, "1Y": 365, ALL: null };
-  const windowedSnapshots = (() => {
-    if (!usingRealSnapshots) return allSnapshots;
+  const windowedSeries = (() => {
     const days = TIMEFRAME_DAYS[timeframe];
-    if (days === null) return allSnapshots;
+    if (days === null) return fullSeries;
     const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-    const filtered = allSnapshots.filter((s) => new Date(s.date).getTime() >= cutoff);
-    // A tight window on a collection with sparse history could filter down to 0-1 points --
-    // show everything available rather than an empty/single-dot chart.
-    return filtered.length > 1 ? filtered : allSnapshots;
+    const filtered = fullSeries.filter((pt) => new Date(pt.date + "T00:00:00Z").getTime() >= cutoff);
+    // A tight window over a sparse history can leave nothing to draw — fall back to the
+    // whole series rather than showing an empty or single-dot chart.
+    return filtered.length > 1 ? filtered : fullSeries;
   })();
 
-  const snapshotDateFormat: Intl.DateTimeFormatOptions =
+  const seriesDateFormat: Intl.DateTimeFormatOptions =
     timeframe === "1W" || timeframe === "1M"
       ? { month: "short", day: "numeric" }
       : { month: "short", year: "2-digit" };
 
-  const valueOverTimeData = usingRealSnapshots
-    ? windowedSnapshots.map((s) => ({
-        date: new Date(s.date).toLocaleDateString(undefined, snapshotDateFormat),
-        value: conv(s.totalMedian),
-      }))
-    : (() => {
-        const dated = shelfItems
-          .map((item) => ({ item, dateStr: item.purchaseDate || item.addedAt }))
-          .filter((x): x is { item: ShelfItem; dateStr: string } => !!x.dateStr && !isNaN(new Date(x.dateStr).getTime()))
-          .sort((a, b) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime());
+  const valueOverTimeData = windowedSeries.map((pt) => ({
+    date: new Date(pt.date + "T00:00:00Z").toLocaleDateString(undefined, seriesDateFormat),
+    value: conv(pt.value),
+  }));
 
-        // Merge same-day entries into one point — otherwise dozens of records sharing a
-        // single addedAt date (e.g. a bulk import, or anything without a purchaseDate set)
-        // print that same date as an x-axis tick over and over, illegibly. Only fall back
-        // to one point per item in the rare case where merging would collapse everything
-        // down to a single point (nothing to plot a line between).
-        const byDay = new Map<string, number>();
-        for (const { item, dateStr } of dated) {
-          const dayKey = new Date(dateStr).toISOString().slice(0, 10);
-          byDay.set(dayKey, (byDay.get(dayKey) || 0) + (item.calculatedValue?.median || 0));
-        }
-
-        if (byDay.size > 1) {
-          let running = 0;
-          return Array.from(byDay.entries())
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .map(([dayKey, dayValue]) => {
-              running += dayValue;
-              return {
-                date: new Date(dayKey).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" }),
-                value: conv(running),
-              };
-            });
-        }
-
-        let running = 0;
-        return dated.map(({ item, dateStr }) => {
-          running += item.calculatedValue?.median || 0;
-          return {
-            date: new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" }),
-            value: conv(running),
-          };
-        });
-      })();
+  // Change across the visible window — the headline figure on any stock chart.
+  const windowChange = (() => {
+    if (windowedSeries.length < 2) return null;
+    const first = windowedSeries[0].value;
+    const last = windowedSeries[windowedSeries.length - 1].value;
+    if (first <= 0) return null;
+    return { abs: last - first, pct: ((last - first) / first) * 100, last };
+  })();
 
   // 5. Top 5 Most Valuable
   const topValuable = [...shelfItems]
@@ -331,30 +298,45 @@ export const CollectionInsightsTab: React.FC<CollectionInsightsTabProps> = ({
       </div>
 
       {/* Collection Value Over Time */}
-      {valueOverTimeData.length > 1 && (
+      {hasSeries && (
         <div className="p-6 rounded-lg bg-[#161616] border border-[#D4AF37]/20 shadow-2xl space-y-4">
-          <div className="flex items-center justify-between border-b border-white/5 pb-3 flex-wrap gap-3">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-[#D4AF37]" />
-              <h3 className="font-serif font-bold text-white text-base">Collection Value Over Time</h3>
-            </div>
-            {usingRealSnapshots ? (
-              <div className="flex items-center rounded-md border border-white/10 overflow-hidden">
-                {(["1W", "1M", "3M", "1Y", "ALL"] as const).map((tf) => (
-                  <button
-                    key={tf}
-                    onClick={() => setTimeframe(tf)}
-                    className={`px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider transition cursor-pointer ${
-                      timeframe === tf ? "bg-[#D4AF37] text-black" : "text-zinc-400 hover:text-white hover:bg-white/5"
+          <div className="flex items-start justify-between border-b border-white/5 pb-3 flex-wrap gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-[#D4AF37]" />
+                <h3 className="font-serif font-bold text-white text-base">Collection Value Over Time</h3>
+              </div>
+              {windowChange && (
+                <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5 mt-1.5 sm:pl-7">
+                  <span className="text-lg font-serif font-bold text-white tabular-nums">
+                    {format(windowChange.last)}
+                  </span>
+                  <span
+                    className={`text-xs font-mono font-bold tabular-nums ${
+                      windowChange.abs >= 0 ? "text-emerald-400" : "text-red-400"
                     }`}
                   >
-                    {tf}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <span className="text-xs font-mono text-zinc-400">By acquisition order (building history)</span>
-            )}
+                    {windowChange.abs >= 0 ? "+" : "-"}
+                    {format(Math.abs(windowChange.abs))} ({windowChange.abs >= 0 ? "+" : "-"}
+                    {Math.abs(windowChange.pct).toFixed(1)}%)
+                  </span>
+                  <span className="text-[10px] font-mono text-zinc-500">{timeframe}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center rounded-md border border-white/10 overflow-hidden">
+              {(["1W", "1M", "3M", "1Y", "ALL"] as const).map((tf) => (
+                <button
+                  key={tf}
+                  onClick={() => setTimeframe(tf)}
+                  className={`px-2.5 py-1.5 min-h-11 lg:min-h-0 text-[10px] font-mono font-bold uppercase tracking-wider transition cursor-pointer ${
+                    timeframe === tf ? "bg-[#D4AF37] text-black" : "text-zinc-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  {tf}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="h-64 w-full pt-4">
             <ResponsiveContainer width="100%" height="100%">

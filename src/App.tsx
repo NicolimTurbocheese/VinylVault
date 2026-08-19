@@ -40,6 +40,12 @@ const INITIAL_SEED_SHELF: ShelfItem[] = [];
 export default function App() {
   const [activeTab, setActiveTab] = useState<"scan" | "shelf" | "insights" | "organise" | "wantlist">("scan");
   const [shelfItems, setShelfItems] = useState<ShelfItem[]>([]);
+  // Mirrors shelfItems but is updated synchronously on every write. Bulk operations (fetch
+  // covers / tracklists / market prices, recalculate all) call the save path in an async
+  // loop; each iteration would otherwise close over the shelfItems value from the render
+  // that started the loop, so every save rebuilt the array from the same stale snapshot and
+  // silently discarded the previous record's update — only the final record persisted.
+  const shelfItemsRef = useRef<ShelfItem[]>([]);
   const [boxes, setBoxes] = useState<VinylBox[]>([]);
   const [wantlist, setWantlist] = useState<WantlistItem[]>([]);
 
@@ -186,6 +192,7 @@ export default function App() {
       mergedList = INITIAL_SEED_SHELF.map(sanitizeShelfItem);
     }
 
+    shelfItemsRef.current = mergedList;
     setShelfItems(mergedList);
     localStorage.setItem(CANONICAL_KEY, JSON.stringify(mergedList));
 
@@ -199,6 +206,7 @@ export default function App() {
 
   const saveShelfToLocal = (items: ShelfItem[]) => {
     const cleanedItems = items.map(sanitizeShelfItem);
+    shelfItemsRef.current = cleanedItems;
     setShelfItems(cleanedItems);
     localStorage.setItem("vinylvault_shelf", JSON.stringify(cleanedItems));
   };
@@ -307,12 +315,14 @@ export default function App() {
 
   const handleSaveToShelf = (item: ShelfItem, opts: { showFeedback?: boolean } = {}) => {
     const { showFeedback = true } = opts;
-    const existingIndex = shelfItems.findIndex((i) => i.id === item.id);
+    // Read through the ref, not the closed-over state — see shelfItemsRef above.
+    const current = shelfItemsRef.current;
+    const existingIndex = current.findIndex((i) => i.id === item.id);
     let updated: ShelfItem[];
     let itemToStore = item;
 
     if (existingIndex >= 0) {
-      const existing = shelfItems[existingIndex];
+      const existing = current[existingIndex];
       const gradingOrValueChanged =
         existing.mediaGrade !== item.mediaGrade ||
         existing.sleeveGrade !== item.sleeveGrade ||
@@ -330,10 +340,10 @@ export default function App() {
         itemToStore = { ...item, history: [entry, ...(existing.history || [])] };
       }
 
-      updated = [...shelfItems];
+      updated = [...current];
       updated[existingIndex] = itemToStore;
     } else {
-      updated = [item, ...shelfItems];
+      updated = [item, ...current];
     }
 
     saveShelfToLocal(updated);

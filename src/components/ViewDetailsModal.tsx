@@ -7,6 +7,7 @@ import { RecordCoverImage } from "./RecordCoverImage";
 import { useEscapeToClose } from "../hooks/useEscapeToClose";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { useCurrency } from "../context/CurrencyContext";
+import { latestObservation, estimateVsMarket } from "../utils/marketData";
 
 interface ViewDetailsModalProps {
   isOpen: boolean;
@@ -25,6 +26,8 @@ export const ViewDetailsModal: React.FC<ViewDetailsModalProps> = ({ isOpen, onCl
 
   if (!isOpen || !item) return null;
 
+  const marketLatest = latestObservation(item);
+  const vsMarket = estimateVsMarket(item);
   const norm = normalizeDiscogsGenre(item.genre, item.styles);
   const boxName =
     item.boxId && item.boxId !== UNCATEGORISED_BOX_ID
@@ -131,6 +134,29 @@ export const ViewDetailsModal: React.FC<ViewDetailsModalProps> = ({ isOpen, onCl
                 {item.purchasePrice != null ? format(item.purchasePrice) : "N/A"}
               </span>
             </div>
+            {marketLatest && (
+              <div className="p-3.5 rounded-lg bg-[#EFEAE0] border border-[#D8D0C0]">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-[#A94A42] block mb-1 flex items-center gap-1">
+                  <DollarSign className="w-3 h-3" /> Listed From
+                </span>
+                <span className="text-lg font-serif font-bold text-[#A94A42]">
+                  {format(marketLatest.lowestPriceSGD)}
+                </span>
+                <span className="block text-[9px] font-sans text-[#6B655B] mt-0.5">
+                  {marketLatest.numForSale} for sale · {new Date(marketLatest.date).toLocaleDateString()}
+                  {vsMarket && (
+                    <>
+                      {" · est. "}
+                      <span className={vsMarket.diff >= 0 ? "text-emerald-700" : "text-red-700"}>
+                        {vsMarket.diff >= 0 ? "+" : "-"}
+                        {Math.abs(vsMarket.pct).toFixed(0)}%
+                      </span>
+                    </>
+                  )}
+                </span>
+              </div>
+            )}
+
             <div className="p-3.5 rounded-lg bg-[#EFEAE0] border border-[#D8D0C0]">
               <span className="text-[9px] font-bold uppercase tracking-wider text-[#A94A42] block mb-1 flex items-center gap-1">
                 <Calendar className="w-3 h-3" /> Purchase Date
@@ -215,7 +241,7 @@ export const ViewDetailsModal: React.FC<ViewDetailsModalProps> = ({ isOpen, onCl
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#E2DCD0]">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-md border border-[#D8D0C0] text-xs font-sans font-bold text-[#6B655B] hover:bg-[#EFEAE0] transition cursor-pointer"
+              className="px-4 py-2 min-h-11 lg:min-h-0 rounded-md border border-[#D8D0C0] text-xs font-sans font-bold text-[#6B655B] hover:bg-[#EFEAE0] transition cursor-pointer"
             >
               Close
             </button>
@@ -224,7 +250,7 @@ export const ViewDetailsModal: React.FC<ViewDetailsModalProps> = ({ isOpen, onCl
                 onClose();
                 onEdit(item);
               }}
-              className="px-5 py-2.5 rounded-md bg-[#A94A42] hover:bg-[#8E3E37] text-white text-xs font-sans font-bold uppercase tracking-wider transition shadow-sm cursor-pointer"
+              className="px-5 py-2.5 min-h-11 lg:min-h-0 rounded-md bg-[#A94A42] hover:bg-[#8E3E37] text-white text-xs font-sans font-bold uppercase tracking-wider transition shadow-sm cursor-pointer"
             >
               Edit This Record
             </button>

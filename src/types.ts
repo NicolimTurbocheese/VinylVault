@@ -185,10 +185,29 @@ export interface ShelfItem extends RecordScanResult {
   // check the physical record and confirm or correct it.
   needsReview?: boolean;
   reviewNotes?: string;
+  // Cached Discogs release id, saved after the first successful marketplace lookup so
+  // later polls skip the search step (one API call per record instead of two).
+  discogsReleaseId?: string;
+  // Observed marketplace readings, oldest first, at most one per day. Each entry is what
+  // the cheapest copy was actually LISTED at on that date — a real measurement, unlike
+  // calculatedValue which is the app's own estimate. Discogs does not expose sold prices
+  // or any history via its API, so this series can only be built forward from first use.
+  marketObservations?: MarketObservation[];
   // Snapshot log of grading/value changes over time, newest first. Appended to (not
   // overwritten) whenever a save actually changes mediaGrade, sleeveGrade, obiCondition,
   // or calculatedValue.median — a running history rather than only the current state.
   history?: ValueHistoryEntry[];
+}
+
+export interface MarketObservation {
+  date: string; // YYYY-MM-DD
+  // Converted to SGD (the app's native unit) at capture time, so it lines up with
+  // calculatedValue without needing the original rate later.
+  lowestPriceSGD: number;
+  // What Discogs actually reported, kept for traceability.
+  rawPrice: number;
+  rawCurrency: string;
+  numForSale: number;
 }
 
 export interface ValueHistoryEntry {

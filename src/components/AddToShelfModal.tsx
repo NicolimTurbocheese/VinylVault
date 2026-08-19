@@ -348,6 +348,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
               catalogueNumber={catalogueNumber || activeRecord.catalogueNumber}
               matrixCode={matrixCode}
               onImageChange={(newUrl) => setCoverArtUrl(newUrl)}
+              compactOverlay
               className="w-16 h-16 rounded border border-[#D8D0C0] shadow-xs flex-shrink-0"
               imgClassName="w-full h-full object-cover rounded"
             />
@@ -357,14 +358,14 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
                 value={albumTitle}
                 onChange={(e) => setAlbumTitle(e.target.value)}
                 placeholder="Album Title"
-                className="w-full font-serif font-bold text-base text-[#2B2B2B] bg-transparent border-b border-transparent hover:border-[#D8D0C0] focus:border-[#A94A42] focus:outline-none transition px-0 py-0.5"
+                className="w-full font-serif font-bold text-base text-[#2B2B2B] bg-transparent border-b border-transparent hover:border-[#D8D0C0] focus:border-[#A94A42] focus:outline-none transition px-0 py-1.5 lg:py-0.5 min-h-11 lg:min-h-0"
               />
               <input
                 type="text"
                 value={artist}
                 onChange={(e) => setArtist(e.target.value)}
                 placeholder="Artist"
-                className="w-full text-xs font-serif text-[#A94A42] font-medium bg-transparent border-b border-transparent hover:border-[#D8D0C0] focus:border-[#A94A42] focus:outline-none transition px-0 py-0.5 mt-0.5"
+                className="w-full text-xs font-serif text-[#A94A42] font-medium bg-transparent border-b border-transparent hover:border-[#D8D0C0] focus:border-[#A94A42] focus:outline-none transition px-0 py-1.5 lg:py-0.5 mt-0.5 min-h-11 lg:min-h-0"
               />
 
               {/* Cat#, Matrix, Barcode, Year, Publisher - All uniform plain text design */}
@@ -436,7 +437,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
               <select
                 value={genre}
                 onChange={(e) => setGenre(e.target.value)}
-                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] rounded-md px-3 py-2 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
+                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] rounded-md px-3 py-2 min-h-11 lg:min-h-0 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
               >
                 {DISCOGS_MACRO_GENRES.map((g) => (
                   <option key={g} value={g}>{g}</option>
@@ -651,7 +652,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
                 placeholder="e.g. CP-8430"
                 value={catalogueNumber}
                 onChange={(e) => setCatalogueNumber(e.target.value)}
-                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] placeholder-[#8C857B] rounded-md px-3 py-2 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
+                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] placeholder-[#8C857B] rounded-md px-3 py-2 min-h-11 lg:min-h-0 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
               />
             </div>
             <div>
@@ -664,7 +665,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
                 placeholder="e.g. MWZ 8107 A-1"
                 value={matrixCode}
                 onChange={(e) => setMatrixCode(e.target.value)}
-                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] placeholder-[#8C857B] rounded-md px-3 py-2 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
+                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] placeholder-[#8C857B] rounded-md px-3 py-2 min-h-11 lg:min-h-0 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
               />
             </div>
             <div>
@@ -676,7 +677,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
                 type="date"
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] rounded-md px-3 py-2 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
+                className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] rounded-md px-3 py-2 min-h-11 lg:min-h-0 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
               />
             </div>
           </div>
@@ -820,7 +821,7 @@ export const AddToShelfModal: React.FC<AddToShelfModalProps> = ({
             <select
               value={boxId}
               onChange={(e) => setBoxId(e.target.value)}
-              className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] rounded-md px-3 py-2 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
+              className="w-full bg-[#EFEAE0] border border-[#D8D0C0] text-[#2B2B2B] rounded-md px-3 py-2 min-h-11 lg:min-h-0 text-xs font-sans focus:outline-none focus:border-[#A94A42] transition"
             >
               <option value={UNCATEGORISED_BOX_ID}>Uncategorised</option>
               {boxes.map((b) => (

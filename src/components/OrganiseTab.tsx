@@ -211,6 +211,7 @@ export const OrganiseTab: React.FC<OrganiseTabProps> = ({
                         artist={item.artist}
                         albumTitle={item.albumTitle}
                         catalogueNumber={item.catalogueNumber}
+                        compactOverlay
                         className="w-11 h-11 rounded border border-[#E2DCD0] shadow-xs flex-shrink-0"
                         imgClassName="w-full h-full object-cover rounded"
                         showRefreshOverlay={false}

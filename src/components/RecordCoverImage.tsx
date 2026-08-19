@@ -50,6 +50,11 @@ interface RecordCoverImageProps {
   alt?: string;
   onImageChange?: (newUrl: string) => void;
   showRefreshOverlay?: boolean;
+  // Set on small thumbnails (roughly 64px or under). The overlay buttons are sized for a
+  // comfortable touch target on a full-size cover, but two of those side by side are wider
+  // than a 64px thumbnail — they overlap each other and spill past the artwork. Callers
+  // rendering a small cover opt into tighter controls instead.
+  compactOverlay?: boolean;
 }
 
 export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
@@ -62,6 +67,7 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
   imgClassName = "w-full h-full object-cover rounded",
   alt,
   onImageChange,
+  compactOverlay = false,
   showRefreshOverlay = true,
 }) => {
   const [currentUrl, setCurrentUrl] = useState<string>(src || "");
@@ -287,7 +293,7 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
 
       {/* Small Refresh Button - ALWAYS AVAILABLE on hover or tap, or prominently if error */}
       {showRefreshOverlay && (
-        <div className="absolute bottom-1 right-1 z-10 flex items-center gap-1">
+        <div className={`absolute z-10 flex items-center ${compactOverlay ? "bottom-0.5 right-0.5 gap-0.5" : "bottom-1 right-1 gap-1"}`}>
           <input
             ref={fileInputRef}
             type="file"
@@ -303,7 +309,7 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
               setIsScanModalOpen(true);
             }}
             disabled={isLoading}
-            className="p-1.5 min-w-8 min-h-8 rounded-full shadow-md transition-all cursor-pointer flex items-center justify-center bg-black/75 hover:bg-[#2D4A3E] text-white opacity-80 group-hover/cover:opacity-100 hover:scale-110"
+            className={`${compactOverlay ? "p-1" : "p-1.5 min-w-8 min-h-8"} rounded-full shadow-md transition-all cursor-pointer flex items-center justify-center bg-black/75 hover:bg-[#2D4A3E] text-white opacity-80 group-hover/cover:opacity-100 hover:scale-110`}
             title="Scan a photo of your own copy instead"
           >
             <Camera className="w-3 h-3" />
@@ -312,7 +318,7 @@ export const RecordCoverImage: React.FC<RecordCoverImageProps> = ({
             type="button"
             onClick={handleFetchAlternativeImage}
             disabled={isLoading}
-            className={`p-1.5 min-w-8 min-h-8 rounded-full shadow-md transition-all cursor-pointer flex items-center justify-center ${
+            className={`${compactOverlay ? "p-1" : "p-1.5 min-w-8 min-h-8"} rounded-full shadow-md transition-all cursor-pointer flex items-center justify-center ${
               hasError
                 ? "bg-[#A94A42] text-white hover:bg-[#8E3E37] ring-2 ring-white scale-100 opacity-100"
                 : "bg-black/75 hover:bg-[#A94A42] text-white opacity-80 group-hover/cover:opacity-100 hover:scale-110"

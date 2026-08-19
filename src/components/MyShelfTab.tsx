@@ -39,6 +39,7 @@ import { cleanFormatSpec } from "../utils/format";
 import { normalizeDiscogsGenre, DISCOGS_MACRO_GENRES } from "../utils/genre";
 import { apiUrl } from "../utils/apiBase";
 import { findDuplicateGroups, DuplicateGroup } from "../utils/duplicateCheck";
+import { withMarketObservation, toSGD } from "../utils/marketData";
 import { RecordCoverImage } from "./RecordCoverImage";
 import { CoverflowCarousel } from "./CoverflowCarousel";
 import { ViewDetailsModal } from "./ViewDetailsModal";
@@ -99,6 +100,8 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
   const missingCoverItems = shelfItems.filter((i) => !i.coverArtUrl);
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[] | null>(null);
   const [isAuditOpen, setIsAuditOpen] = useState(false);
+  const [marketFetchProgress, setMarketFetchProgress] = useState<{ done: number; total: number; found: number } | null>(null);
+  const [marketFetchError, setMarketFetchError] = useState<string | null>(null);
   const [randomPick, setRandomPick] = useState<ShelfItem | null>(null);
   const [randomPickGenre, setRandomPickGenre] = useState<string>("");
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -280,6 +283,71 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
       await new Promise((resolve) => setTimeout(resolve, 400));
     }
     setTimeout(() => setTracklistFetchProgress(null), 4000);
+  };
+
+  // Polls Discogs' marketplace stats for every record, recording what the cheapest listed
+  // copy is going for today. Unlike the cover/tracklist fetches this is not a one-off
+  // backfill — it's meant to be re-run periodically, since each run adds another real
+  // measured point to that record's market series.
+  const handleFetchMarketPrices = async () => {
+    const targets = shelfItems;
+    if (targets.length === 0) return;
+    setMarketFetchProgress({ done: 0, total: targets.length, found: 0 });
+    let found = 0;
+    let unauthorized = false;
+    const today = new Date().toISOString().slice(0, 10);
+
+    for (let i = 0; i < targets.length; i++) {
+      const item = targets[i];
+      try {
+        const res = await fetch(
+          `${apiUrl("marketStats")}?artist=${encodeURIComponent(item.artist)}&albumTitle=${encodeURIComponent(
+            item.albumTitle
+          )}&catalogueNumber=${encodeURIComponent(item.catalogueNumber || "")}&releaseId=${encodeURIComponent(
+            item.discogsReleaseId || ""
+          )}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          // A token that isn't cleared for marketplace data fails identically for every
+          // record — stop rather than burn 160+ pointless calls.
+          if (data.reason === "not-authorized" || data.reason === "no-token") {
+            unauthorized = true;
+            break;
+          }
+          if (data.available && typeof data.lowestPrice === "number") {
+            const updated = withMarketObservation(
+              { ...item, discogsReleaseId: data.releaseId || item.discogsReleaseId },
+              {
+                date: today,
+                lowestPriceSGD: Math.round(toSGD(data.lowestPrice, data.currency) * 100) / 100,
+                rawPrice: data.lowestPrice,
+                rawCurrency: data.currency,
+                numForSale: data.numForSale || 0,
+              }
+            );
+            onQuickUpdateItem(updated);
+            found++;
+          } else if (data.releaseId && !item.discogsReleaseId) {
+            // Nothing listed right now, but cache the resolved id so the next run is cheaper.
+            onQuickUpdateItem({ ...item, discogsReleaseId: data.releaseId });
+          }
+        }
+      } catch (err) {
+        console.warn("Market price fetch failed for", item.albumTitle, err);
+      }
+      setMarketFetchProgress({ done: i + 1, total: targets.length, found });
+      // Discogs' authenticated rate limit is 60 requests/minute; a resolved release id
+      // costs one call and an unresolved one costs two, so pace conservatively.
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+    }
+
+    setMarketFetchError(
+      unauthorized
+        ? "Your Discogs token isn't authorized for marketplace data, so no prices were recorded."
+        : null
+    );
+    setTimeout(() => setMarketFetchProgress(null), 4000);
   };
 
   const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -866,6 +934,23 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                 <button
                   onClick={() => {
                     setIsMoreMenuOpen(false);
+                    handleFetchMarketPrices();
+                  }}
+                  disabled={shelfItems.length === 0 || !!marketFetchProgress}
+                  title="Record today's lowest listed price on Discogs for each record — re-run periodically to build a real market history"
+                  className="w-full px-3.5 py-2.5 lg:py-2 min-h-11 lg:min-h-0 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <DollarSign className="w-3.5 h-3.5 text-[#6B655B]" />
+                  <span>
+                    {marketFetchProgress
+                      ? `Checking prices ${marketFetchProgress.done}/${marketFetchProgress.total}...`
+                      : "Fetch Market Prices (Discogs)"}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
                     setIsAuditOpen(true);
                   }}
                   disabled={shelfItems.length === 0}
@@ -893,6 +978,17 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             )}
           </div>
         </div>
+        {marketFetchError && (
+          <div className="text-xs font-sans text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+            {marketFetchError}
+          </div>
+        )}
+        {marketFetchProgress && marketFetchProgress.done === marketFetchProgress.total && (
+          <div className="text-xs font-sans text-[#6B655B] bg-[#EFEAE0] border border-[#D8D0C0] rounded-md px-3 py-2">
+            Recorded today's listed price for {marketFetchProgress.found} of {marketFetchProgress.total} records.
+            Re-run this periodically — each run adds another real data point.
+          </div>
+        )}
         {importError && (
           <div className="text-xs font-sans text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
             Import failed: {importError}
