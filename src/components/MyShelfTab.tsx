@@ -742,32 +742,14 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
             </button>
           )}
 
-          {shelfItems.length > 0 && (
+          {isSelectMode && (
             <button
-              onClick={() => {
-                setRandomPickGenre("");
-                pickRandom("");
-              }}
-              title="Pick a random record to play tonight"
-              className="px-3 py-1.5 min-h-11 lg:min-h-0 lg:px-2.5 rounded-md border border-[#D8D0C0] bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40 flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
-            >
-              <Shuffle className="w-3.5 h-3.5" />
-              <span>Random</span>
-            </button>
-          )}
-
-          {shelfItems.length > 0 && (
-            <button
-              onClick={() => (isSelectMode ? exitSelectMode() : setIsSelectMode(true))}
-              title="Select multiple records to batch-edit"
-              className={`px-3 py-1.5 min-h-11 lg:min-h-0 lg:px-2.5 rounded-md border flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer ${
-                isSelectMode
-                  ? "bg-[#A94A42] text-white border-[#A94A42]"
-                  : "border-[#D8D0C0] bg-[#EFEAE0] text-[#6B655B] hover:bg-[#E2DCD0]/40"
-              }`}
+              onClick={exitSelectMode}
+              title="Leave selection mode"
+              className="px-3 py-1.5 min-h-11 lg:min-h-0 lg:px-2.5 rounded-md border bg-[#A94A42] text-white border-[#A94A42] flex items-center justify-center gap-1.5 text-[10px] font-bold uppercase tracking-wider transition cursor-pointer"
             >
               <CheckSquare className="w-3.5 h-3.5" />
-              <span>{isSelectMode ? `${selectedIds.size} Selected` : "Select"}</span>
+              <span>{selectedIds.size} Selected — Done</span>
             </button>
           )}
 
@@ -938,6 +920,33 @@ export const MyShelfTab: React.FC<MyShelfTabProps> = ({
                   <Layers className="w-3.5 h-3.5 text-[#6B655B]" />
                   <span>Check for Duplicates</span>
                 </button>
+
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    setRandomPickGenre("");
+                    pickRandom("");
+                  }}
+                  disabled={shelfItems.length === 0}
+                  className="w-full px-3.5 py-2.5 lg:py-2 min-h-11 lg:min-h-0 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Shuffle className="w-3.5 h-3.5 text-[#6B655B]" />
+                  <span>Pick a Random Record</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    setIsSelectMode(true);
+                  }}
+                  disabled={shelfItems.length === 0}
+                  className="w-full px-3.5 py-2.5 lg:py-2 min-h-11 lg:min-h-0 flex items-center gap-2.5 text-xs text-[#2B2B2B] hover:bg-[#EFEAE0] transition cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <CheckSquare className="w-3.5 h-3.5 text-[#6B655B]" />
+                  <span>Select Multiple Records</span>
+                </button>
+
+                <div className="my-1.5 border-t border-[#E2DCD0]" />
 
                 <button
                   onClick={() => {

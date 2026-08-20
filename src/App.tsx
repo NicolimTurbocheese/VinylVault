@@ -725,6 +725,9 @@ export default function App() {
           <p className="text-[#6B655B] text-[11px]">
             Goldmine Grading Standard (M, NM, VG+, VG, G, F/P) Valuation Engine
           </p>
+          <p className="text-[#6B655B] text-[11px]">
+            © {new Date().getFullYear()} Nico &amp; Ryan · All rights reserved
+          </p>
         </div>
       </footer>
 
